@@ -57,20 +57,20 @@ struct Program {
     Filter filter_1;
 };
 
-struct Controller {
+struct App {
     Program program;
     MidiInterface* midi;
 };
 
-Controller g_cntr = {};
+App g_app = {};
 
-bool controller_init(Controller& out_controller) {
-    Log(LogLevel::Info, "Initializing Controller");
+bool app_init(App& out_app) {
+    Log(LogLevel::Info, "Initializing controller");
 
-    out_controller.program = {};
-    out_controller.midi = new DummyMidi();
+    out_app.program = {};
+    out_app.midi = new DummyMidi();
 
-    if (out_controller.midi == nullptr) {
+    if (out_app.midi == nullptr) {
         Log(LogLevel::Error, "Failed to allocate MIDI interface");
 
         return false;
@@ -82,8 +82,8 @@ bool controller_init(Controller& out_controller) {
 }
 
 void parameter_knob(int& param, ControlChange cc) {
-    if (ImGuiKnobs::KnobInt(control_change_name(cc), &param, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) { \
-        g_cntr.midi->send_control_change(cc, param); \
+    if (ImGuiKnobs::KnobInt(control_change_name(cc), &param, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
+        g_app.midi->send_control_change(cc, param);
     }
 }
 
@@ -101,33 +101,30 @@ void program_gui(Program& program) {
     filter_gui(program.filter_1, "Filter 1");
 }
 
-void gui() {
-    program_gui(g_cntr.program);
+void app_gui() {
+    program_gui(g_app.program);
 
 #ifndef NDEBUG
     ImGui::ShowDemoWindow();
 #endif
 }
 
-
 int main(int , char *[]) {
-    bool succ = controller_init(g_cntr);
+    bool succ = app_init(g_app);
     if (!succ) {
         printf("Failed to initialize controller\n");
         return 1;
     }
-
 
 #ifdef ASSETS_LOCATION
     HelloImGui::SetAssetsFolder(ASSETS_LOCATION);
 #endif
 
     HelloImGui::SimpleRunnerParams runnnerParams;
-    runnnerParams.guiFunction = gui;
+    runnnerParams.guiFunction = app_gui;
     runnnerParams.windowSize = {600, 800};
 
     ImmApp::AddOnsParams addOnsParams;
-    addOnsParams.withMarkdown = true;
     addOnsParams.withImplot = true;
 
     ImmApp::Run(runnnerParams, addOnsParams);
