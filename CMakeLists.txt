@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.12)
 project(microkorgxl_controller)
-set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if (!WIN32)
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Wconversion -Wuseless-cast -Wnull-dereference -Wlogical-op $<$<CONFIG:DEBUG>:-fsanitize=address,undefined,leak>")
+else ()
+    set(CMAKE_CXX_FLAGS "")
+endif ()
 
 # Add imgui_bundle
 # =================
@@ -22,8 +29,13 @@ if (NOT TARGET imgui_bundle)
     # set(IMMVISION_FETCH_OPENCV ON)
 endif()
 
+# Add JACK
+# ==============
 
-
+find_package(jack)
+if (NOT jack_FOUND)
+    message(FATAL_ERROR "JACK Library not found.")
+endif()
 
 # Build your app
 # ==============
@@ -39,37 +51,11 @@ endif()
 # Now you can build your app with
 #     mkdir build && cd build && cmake .. && cmake --build .
 
-# By default, we install in a portable way (i.e. assets and executable are in the same folder)
-option(EXAMPLE_INTEGRATION_PORTABLE_INSTALL "Install in a portable way" ON)
+# portable installation is the easiest way to install the app
+imgui_bundle_add_app(microkorgxl_controller src/main.cpp)
 
-
-if (EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
-    # portable installation is the easiest way to install the app
-    imgui_bundle_add_app(${PROJECT_NAME} src/main.cpp)
-else()
-    # Disable HelloImGui default install behavior
-    set(HELLOIMGUI_ADD_APP_WITH_INSTALL OFF CACHE BOOL "" FORCE)
-
-    imgui_bundle_add_app(${PROJECT_NAME} src/main.cpp)
-
-    # If not portable, we have to
-    # - install the app manually
-    # - install the assets manually
-    # - pass the assets location to the app, and set this assets location in main() via the compile definition ASSETS_LOCATION:
-    #     #ifdef ASSETS_LOCATION \n HelloImGui::SetAssetsFolder(ASSETS_LOCATION); \n #endif
-    if (NOT EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
-        include(GNUInstallDirs)
-        install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
-        set(assets_install_dir ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
-        if (NOT IS_ABSOLUTE ${assets_install_dir})
-            set(assets_install_dir ${CMAKE_INSTALL_PREFIX}/${assets_install_dir})
-        endif()
-        install(DIRECTORY assets DESTINATION ${assets_install_dir})
-        target_compile_definitions(${PROJECT_NAME} PRIVATE ASSETS_LOCATION="${assets_install_dir}/assets")
-    endif()
-
+include_directories(microkorgxl_controller ${JACK_INCLUDE_DIRS})
+target_link_libraries(microkorgxl_controller PRIVATE ${JACK_LIBRARIES})
+if (${JACK_DEFINITIONS})
+    add_definitions(microkorgxl_controller ${JACK_DEFINITIONS})
 endif()
-
-
-
-
