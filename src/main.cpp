@@ -24,7 +24,32 @@ using HelloImGui::LogLevel;
 
 #define CONTROL_CHANGE_ENUM(VARIANT)                                 \
     VARIANT(CC_FILTER1_CUTOFF, 74)                                   \
-    VARIANT(CC_FILTER1_RESO, 71)                                     
+    VARIANT(CC_FILTER1_RESO, 71)                                     \
+    VARIANT(CC_FILTER1_TYPE_BAL, 27)                                 \
+    VARIANT(CC_FILTER1_ROUTING1, 26)                                 \
+    VARIANT(CC_FILTER1_EG1_INT, 79)                                  \
+    VARIANT(CC_OSC1_WAVE, 8)                                         \
+    VARIANT(CC_OSC1_OSC_MODE, 9)                                     \
+    VARIANT(CC_OSC1_OSC1C1, 15)                                      \
+    VARIANT(CC_OSC1_OSC1C2, 17)                                      \
+    VARIANT(CC_UNISON_MODE, 3)                                       \
+    VARIANT(CC_MIXER_OSC1_LVL, 23)                                   \
+    VARIANT(CC_MIXER_NOISE_LVL, 25)                                  \
+    VARIANT(CC_AMP_LEVEL, 7)                                         \
+    VARIANT(CC_AMP_PANPOT, 10)                                       \
+    VARIANT(CC_DRIVE_WS_WS_DEPTH, 83)                                \
+    VARIANT(CC_EG1_ATTACK, 85)                                       \
+    VARIANT(CC_EG1_DECAY, 86)                                        \
+    VARIANT(CC_EG1_SUSTAIN, 87)                                      \
+    VARIANT(CC_EG1_RELEASE, 88)                                      \
+    VARIANT(CC_LFO1_WAVE, 89)                                        \
+    VARIANT(CC_LFO1_FREQ, 90)                                        \
+    VARIANT(CC_PATCH1_INTENSTY, 103)                                 \
+    VARIANT(CC_EQ_LO_GAIN, 110)                                      \
+    VARIANT(CC_EQ_HI_GAIN, 109)                                      \
+    VARIANT(CC_MST_FX1_DRY_WET, 115)                                 \
+    VARIANT(CC_MST_FX1_CTRL_1, 12)                                   \
+    VARIANT(CC_MST_FX1_CTRL_2, 112)                                  \
 
 #define CONTROL_CHANGE_ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 #define CONTROL_CHANGE_ENUM_STRING(NAME, VALUE) case NAME: return #NAME;
@@ -151,10 +176,76 @@ err:
 struct Filter {
     int cutoff;
     int resonance;
+    int type_bal;
+    int routing1;
+    int eg1_int;
+    int key_trk;
+};
+
+struct Oscillator {
+    int wave;
+    int osc_mode;
+    int osc1c1;
+    int osc1c2;
+};
+
+struct Unison {
+    int mode;
+};
+
+struct Mixer {
+    int osc1_lvl;
+    int noise_lvl;
+};
+
+struct Amp {
+    int level;
+    int panpot;
+};
+
+struct Drive_ws {
+    int ws_depth;
+};
+
+struct Envelope_Generator {
+    int attack;
+    int decay;
+    int sustain;
+    int release;
+};
+
+struct Low_Frequency_Oscillator {
+    int wave;
+    int freq;
+};
+
+struct Patch {
+    int intensty;
+};
+
+struct Equalizer {
+    int lo_gain;
+    int hi_gain;
+};
+
+struct Master_Effects {
+    int dry_wet;
+    int ctrl_1;
+    int ctrl_2;
 };
 
 struct Program {
     Filter filter_1;
+    Oscillator osc_1;
+    Unison unison;
+    Mixer mixer;
+    Amp amp;
+    Drive_ws drive_ws;
+    Envelope_Generator eg_1;
+    Low_Frequency_Oscillator lfo_1;
+    Patch patch_1;
+    Equalizer eq;
+    Master_Effects mst_fx_1;
 };
 
 struct App {
@@ -198,6 +289,116 @@ void filter_gui(Filter& filter, const char* window_name) {
         parameter_knob(filter.cutoff, CC_FILTER1_CUTOFF);
         ImGui::SameLine();
         parameter_knob(filter.resonance, CC_FILTER1_RESO);
+        ImGui::SameLine();
+        parameter_knob(filter.type_bal, CC_FILTER1_TYPE_BAL);
+        ImGui::SameLine();
+        parameter_knob(filter.routing1, CC_FILTER1_ROUTING1);
+        ImGui::SameLine();
+        parameter_knob(filter.eg1_int, CC_FILTER1_EG1_INT);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void oscillator_gui(Oscillator& osc, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(osc.wave, CC_OSC1_WAVE);
+        ImGui::SameLine();
+        parameter_knob(osc.osc_mode, CC_OSC1_OSC_MODE);
+        ImGui::SameLine();
+        parameter_knob(osc.osc1c1, CC_OSC1_OSC1C1);
+        ImGui::SameLine();
+        parameter_knob(osc.osc1c2, CC_OSC1_OSC1C2);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void unison_gui(Unison& unison, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(unison.mode, CC_UNISON_MODE);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void mixer_gui(Mixer& mix, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(mix.osc1_lvl, CC_MIXER_OSC1_LVL);
+        ImGui::SameLine();
+        parameter_knob(mix.noise_lvl, CC_MIXER_NOISE_LVL);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void amp_gui(Amp& amp, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(amp.level, CC_AMP_LEVEL);
+        ImGui::SameLine();
+        parameter_knob(amp.panpot, CC_AMP_PANPOT);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void drive_gui(Drive_ws& drive_ws, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(drive_ws.ws_depth, CC_DRIVE_WS_WS_DEPTH);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(eg_1.attack, CC_EG1_ATTACK);
+        ImGui::SameLine();
+        parameter_knob(eg_1.decay, CC_EG1_DECAY);
+        ImGui::SameLine();
+        parameter_knob(eg_1.sustain, CC_EG1_SUSTAIN);
+        ImGui::SameLine();
+        parameter_knob(eg_1.release, CC_EG1_RELEASE);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void low_frequency_oscillator_gui(Low_Frequency_Oscillator& lfo_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(lfo_1.wave, CC_LFO1_WAVE);
+        ImGui::SameLine();
+        parameter_knob(lfo_1.freq, CC_LFO1_FREQ);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void patch_gui(Patch& patch_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(patch_1.intensty, CC_PATCH1_INTENSTY);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void equalizer_gui(Equalizer& eq, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(eq.lo_gain, CC_EQ_LO_GAIN);
+        ImGui::SameLine();
+        parameter_knob(eq.hi_gain, CC_EQ_HI_GAIN);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void master_effects_gui(Master_Effects& mst_fx_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(mst_fx_1.dry_wet, CC_MST_FX1_DRY_WET);
+        ImGui::SameLine();
+        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_1);
+        ImGui::SameLine();
+        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_2);
     }
 
     ImGui::End(); // Begin
@@ -205,6 +406,16 @@ void filter_gui(Filter& filter, const char* window_name) {
 
 void program_gui(Program& program) {
     filter_gui(program.filter_1, "Filter 1");
+    oscillator_gui(program.osc_1, "Oscillator 1");
+    unison_gui(program.unison, "Unison");
+    mixer_gui(program.mixer, "Mixer");
+    amp_gui(program.amp, "Amp");
+    drive_gui(program.drive_ws, "Drive/Ws");
+    envelope_generator_gui(program.eg_1, "Envelope generator");
+    low_frequency_oscillator_gui(program.lfo_1, "Low Frequency Oscillator");
+    patch_gui(program.patch_1, "Patch 1");
+    equalizer_gui(program.eq, "Equalizer");
+    master_effects_gui(program.mst_fx_1, "Master effects");
 }
 
 void app_gui() {

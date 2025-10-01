@@ -28,10 +28,16 @@ set_package_properties(jack PROPERTIES
    URL "http://www.jackaudio.org/"
    DESCRIPTION "JACK Audio Connection Kit")
 
-find_package(PkgConfig)
-pkg_check_modules(PC_JACK QUIET jack)
-find_path(JACK_INCLUDE_DIRS NAMES jack/jack.h HINTS ${PC_JACK_INCLUDE_DIRS})
-find_library(JACK_LIBRARIES NAMES jack HINTS ${PC_JACK_LIBRARY_DIRS})
+if(!WIN32) 
+   find_package(PkgConfig)
+   pkg_check_modules(PC_JACK QUIET REQUIRED jack)
+   find_path(JACK_INCLUDE_DIRS NAMES jack/jack.h HINTS ${PC_JACK_INCLUDE_DIRS})
+   find_library(JACK_LIBRARIES NAMES jack HINTS ${PC_JACK_LIBRARY_DIRS})
+else()
+   set(CMAKE_PREFIX_PATH "D:/Program")
+   find_path(JACK_INCLUDE_DIRS NAMES jack/jack.h HINTS ${CMAKE_PREFIX_PATH}/JACK2/include)
+   find_library(JACK_LIBRARIES NAMES jack64 HINTS ${CMAKE_PREFIX_PATH}/JACK2/lib)
+endif()
 
 set(JACK_DEFINITIONS ${PC_JACK_CFLAGS_OTHER})
 
