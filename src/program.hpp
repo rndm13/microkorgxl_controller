@@ -6,14 +6,80 @@
 #define PROGRAM_NAME_LENGTH          8
 
 struct Filter {
-    int balance;
     int cutoff;
     int resonance;
+    int type_bal;
+    int eg1_int;
+    int key_trk;
+    int vel_sens;
+};
+
+struct Oscillator {
+    int wave;
+    int osc_mode;
+    int osc1c1;
+    int osc1c2;
+};
+
+struct Unison {
+    int mode;
+};
+
+struct Mixer {
+    int osc1_lvl;
+    int noise_lvl;
+};
+
+struct Amp {
+    int level;
+    int panpot;
+};
+
+struct Drive_ws {
+    int ws_depth;
+};
+
+struct Envelope_Generator {
+    int attack;
+    int decay;
+    int sustain;
+    int release;
+};
+
+struct Low_Frequency_Oscillator {
+    int wave;
+    int freq;
+};
+
+struct Patch {
+    int intensty;
+};
+
+struct Equalizer {
+    int lo_gain;
+    int hi_gain;
+};
+
+struct Master_Effects {
+    int dry_wet;
+    int ctrl_1;
+    int ctrl_2;
 };
 
 struct Timbre {
     // Filter 2 doesn't have THRU, and LPF24
+    int filter_routing;
     Filter filter_arr[2];
+    Oscillator osc_1;
+    Unison unison;
+    Mixer mixer;
+    Amp amp;
+    Drive_ws drive_ws;
+    Envelope_Generator eg_1;
+    Low_Frequency_Oscillator lfo_1;
+    Patch patch_1;
+    Equalizer eq;
+    Master_Effects mst_fx_1;
 };
 
 struct Program {

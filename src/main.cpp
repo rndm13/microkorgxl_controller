@@ -123,33 +123,33 @@ void filter_graph_gui(Filter& filter, size_t filter_idx) {
     float y[128] = {0};
     float cutoff = filter.cutoff;
     float resonance = filter.resonance;
-    FilterTypeBalance balance = static_cast<FilterTypeBalance>(filter.balance);
+    FilterTypeBalance type_bal = static_cast<FilterTypeBalance>(filter.type_bal);
     if (filter_idx >= 1) {
-        switch (filter.balance) {
+        switch (filter.type_bal) {
             case FTB2_12LPF:
-                balance = FTB_12LPF;
+                type_bal = FTB_12LPF;
                 break;
             case FTB2_HPF:
-                balance = FTB_HPF;
+                type_bal = FTB_HPF;
                 break;
             case FTB2_BPF:
-                balance = FTB_BPF;
+                type_bal = FTB_BPF;
                 break;
             default:
-                balance = FTB_THRU;
+                type_bal = FTB_THRU;
         }
     }
 
     ImVec2 size = {-1, 80};
 
-    if (balance == FTB_THRU) {
+    if (type_bal == FTB_THRU) {
         ImGui::Button("Disabled", size);
         return;
     }
 
     float res_div = 64;
     float min_res = 24;
-    if (balance == FTB_24LPF) {
+    if (type_bal == FTB_24LPF) {
         min_res = 48;
         res_div = 48;
     }
@@ -159,13 +159,13 @@ void filter_graph_gui(Filter& filter, size_t filter_idx) {
             powf((-static_cast<float>(x) + cutoff) * fmax(resonance, min_res) / res_div, 2);
 
         y[x] = parab;
-        if (balance == FTB_HPF) {
+        if (type_bal == FTB_HPF) {
             if (x > cutoff) {
                 y[x] = fmax(0, parab);
             }
         }
 
-        if (balance == FTB_24LPF || balance == FTB_12LPF) {
+        if (type_bal == FTB_24LPF || type_bal == FTB_12LPF) {
             if (x < cutoff) {
                 y[x] = fmax(0, parab);
             }
@@ -201,10 +201,120 @@ void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
     if (ImGui::Begin(window_name)) {
         filter_graph_gui(filter, filter_idx);
 
-        parameter_enum(&filter.balance,  timbre_ex(params[0][filter_idx]), "Balance Type###type_bal", enum_elems, enum_size);
-        parameter_knob(filter.cutoff,    timbre_ex(params[1][filter_idx]), control_change_name(CC_FILTER1_CUTOFF));
+        parameter_enum(&filter.type_bal, timbre_ex(params[0][filter_idx]), "Balance Type###type_bal", enum_elems, enum_size);
+        parameter_knob(filter.cutoff, timbre_ex(params[1][filter_idx]), "Cutoff###cutoff");
         ImGui::SameLine();
-        parameter_knob(filter.resonance, timbre_ex(params[2][filter_idx]), control_change_name(CC_FILTER1_RESO));
+        parameter_knob(filter.resonance, timbre_ex(params[2][filter_idx]), "Resonance###resonance");
+        ImGui::SameLine();
+        parameter_knob(filter.eg1_int, timbre_ex(params[3][filter_idx]), "EG1 Intensity###eg1_int");
+        ImGui::SameLine();
+        parameter_knob(filter.key_trk, timbre_ex(params[4][filter_idx]), "Key tracking###key_trk");
+        ImGui::SameLine();
+        parameter_knob(filter.vel_sens, timbre_ex(params[5][filter_idx]), "Velocity sensitivity###vel_sens");
+    }
+
+    ImGui::End(); // Begin
+}
+
+void oscillator_gui(Oscillator& osc, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(osc.wave, CC_OSC1_WAVE);
+        ImGui::SameLine();
+        parameter_knob(osc.osc_mode, CC_OSC1_OSC_MODE);
+        ImGui::SameLine();
+        parameter_knob(osc.osc1c1, CC_OSC1_OSC1C1);
+        ImGui::SameLine();
+        parameter_knob(osc.osc1c2, CC_OSC1_OSC1C2);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void unison_gui(Unison& unison, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(unison.mode, CC_UNISON_MODE);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void mixer_gui(Mixer& mix, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(mix.osc1_lvl, CC_MIXER_OSC1_LVL);
+        ImGui::SameLine();
+        parameter_knob(mix.noise_lvl, CC_MIXER_NOISE_LVL);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void amp_gui(Amp& amp, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(amp.level, CC_AMP_LEVEL);
+        ImGui::SameLine();
+        parameter_knob(amp.panpot, CC_AMP_PANPOT);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void drive_gui(Drive_ws& drive_ws, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(drive_ws.ws_depth, CC_DRIVE_WS_WS_DEPTH);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(eg_1.attack, CC_EG1_ATTACK);
+        ImGui::SameLine();
+        parameter_knob(eg_1.decay, CC_EG1_DECAY);
+        ImGui::SameLine();
+        parameter_knob(eg_1.sustain, CC_EG1_SUSTAIN);
+        ImGui::SameLine();
+        parameter_knob(eg_1.release, CC_EG1_RELEASE);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void low_frequency_oscillator_gui(Low_Frequency_Oscillator& lfo_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(lfo_1.wave, CC_LFO1_WAVE);
+        ImGui::SameLine();
+        parameter_knob(lfo_1.freq, CC_LFO1_FREQ);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void patch_gui(Patch& patch_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(patch_1.intensty, CC_PATCH1_INTENSTY);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void equalizer_gui(Equalizer& eq, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(eq.lo_gain, CC_EQ_LO_GAIN);
+        ImGui::SameLine();
+        parameter_knob(eq.hi_gain, CC_EQ_HI_GAIN);
+    }
+
+    ImGui::End(); // Begin
+}
+
+void master_effects_gui(Master_Effects& mst_fx_1, const char* window_name) {
+    if (ImGui::Begin(window_name)) {
+        parameter_knob(mst_fx_1.dry_wet, CC_MST_FX1_DRY_WET);
+        ImGui::SameLine();
+        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_1);
+        ImGui::SameLine();
+        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_2);
     }
 
     ImGui::End(); // Begin
@@ -213,6 +323,17 @@ void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
 void timbre_gui(Timbre& timbre) {
     filter_gui(timbre.filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(timbre.filter_arr[1], "Filter 2###filter2", 1);
+
+    oscillator_gui(timbre.osc_1, "Oscillator 1");
+    unison_gui(timbre.unison, "Unison");
+    mixer_gui(timbre.mixer, "Mixer");
+    amp_gui(timbre.amp, "Amp");
+    drive_gui(timbre.drive_ws, "Drive/Ws");
+    envelope_generator_gui(timbre.eg_1, "Envelope generator");
+    low_frequency_oscillator_gui(timbre.lfo_1, "Low Frequency Oscillator");
+    patch_gui(timbre.patch_1, "Patch 1");
+    equalizer_gui(timbre.eq, "Equalizer");
+    master_effects_gui(timbre.mst_fx_1, "Master effects");
 }
 
 void program_gui(Program& program) {
