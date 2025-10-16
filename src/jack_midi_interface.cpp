@@ -37,7 +37,7 @@ bool JACKMidi::send_control_change(uint8_t param_id, uint8_t val) {
     return true;
 }
 
-bool JACKMidi::initialize() {
+bool JACKMidi::init() {
     memset(this->data_queue, 0, sizeof(this->data_queue));
     this->data_queue_size = 0;
     this->jack = jack_client_open(JACK_CLIENT_NAME, JackNoStartServer, NULL);
@@ -76,4 +76,11 @@ err_client:
     jack_client_close(this->jack);
 err:
     return false;
+}
+
+void JACKMidi::deinit() {
+    jack_port_unregister(this->jack, this->jack_port);
+    jack_client_close(this->jack);
+
+    Log(LogLevel::Info, "JACK MIDI controller successfully deinitialized");
 }

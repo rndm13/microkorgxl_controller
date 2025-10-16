@@ -15,8 +15,12 @@ bool DummyMidi::send_control_change(uint8_t param_id, uint8_t val) {
     return true;
 }
 
-bool DummyMidi::initialize() {
+bool DummyMidi::init() {
     Log(LogLevel::Debug, "Dummy MIDI controller successfully initialized");
 
     return true;
+}
+
+void DummyMidi::deinit() {
+    Log(LogLevel::Debug, "Dummy MIDI controller successfully deinitialized");
 }

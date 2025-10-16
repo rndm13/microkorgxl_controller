@@ -4,6 +4,6 @@
 
 struct DummyMidi : public MidiInterface {
     virtual bool send_control_change(uint8_t param_id, uint8_t val) override;
-
-    virtual bool initialize() override;
+    virtual bool init() override;
+    virtual void deinit() override;
 };

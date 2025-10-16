@@ -50,7 +50,7 @@ struct App {
 App g_app = {};
 
 bool app_init(App& out_app) {
-    Log(LogLevel::Info, "Initializing controller");
+    Log(LogLevel::Info, "Initializing app");
 
     out_app.program = {};
     out_app.midi = new JACKMidi();
@@ -61,15 +61,23 @@ bool app_init(App& out_app) {
         return false;
     }
 
-    if (!out_app.midi->initialize()) {
+    if (!out_app.midi->init()) {
         Log(LogLevel::Error, "Failed to initialize MIDI interface");
 
         return false;
     }
 
-    Log(LogLevel::Error, "Successfully initialized controller");
+    Log(LogLevel::Error, "Successfully initialized app");
 
     return true;
+}
+
+void app_deinit(App& app) {
+    Log(LogLevel::Info, "Deinitializing app");
+
+    app.midi->deinit();
+
+    Log(LogLevel::Error, "Successfully deinitialized app");
 }
 
 void parameter_knob(int& param, ControlChange cc) {
@@ -100,9 +108,9 @@ void app_gui() {
 #endif
 }
 
-int main(int , char *[]) {
-    bool succ = app_init(g_app);
-    if (!succ) {
+int main(int, char *[]) {
+    bool ok = app_init(g_app);
+    if (!ok) {
         Log(LogLevel::Error, "Failed to initialize controller\n");
         return 1;
     }
@@ -119,5 +127,8 @@ int main(int , char *[]) {
     addOnsParams.withImplot = true;
 
     ImmApp::Run(runnnerParams, addOnsParams);
+
+    app_deinit(g_app);
+
     return 0;
 }

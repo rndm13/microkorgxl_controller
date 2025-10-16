@@ -23,5 +23,6 @@ struct JACKMidi : public MidiInterface {
     size_t data_queue_size;
 
     virtual bool send_control_change(uint8_t param_id, uint8_t val) override;
-    virtual bool initialize() override;
+    virtual bool init() override;
+    virtual void deinit() override;
 };
