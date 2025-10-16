@@ -52,7 +52,11 @@ endif()
 #     mkdir build && cd build && cmake .. && cmake --build .
 
 # portable installation is the easiest way to install the app
-imgui_bundle_add_app(microkorgxl_controller src/main.cpp)
+imgui_bundle_add_app(microkorgxl_controller
+    src/main.cpp
+    src/dummy_midi_interface.cpp
+    src/jack_midi_interface.cpp
+)
 
 include_directories(microkorgxl_controller ${JACK_INCLUDE_DIRS})
 target_link_libraries(microkorgxl_controller PRIVATE ${JACK_LIBRARIES})
