@@ -119,14 +119,18 @@ int main(int, char *[]) {
     HelloImGui::SetAssetsFolder(ASSETS_LOCATION);
 #endif
 
-    HelloImGui::SimpleRunnerParams runnnerParams;
-    runnnerParams.guiFunction = app_gui;
-    runnnerParams.windowSize = {600, 800};
+    HelloImGui::RunnerParams runnerParams;
+    runnerParams.imGuiWindowParams.showMenuBar = true;
+    runnerParams.imGuiWindowParams.showStatus_Fps = true;
+    runnerParams.callbacks.ShowGui = app_gui;
+
+    runnerParams.appWindowParams.windowTitle = "MicroKORG XL Controller";
+    runnerParams.appWindowParams.windowGeometry = { .size = {600, 800} };
 
     ImmApp::AddOnsParams addOnsParams;
     addOnsParams.withImplot = true;
 
-    ImmApp::Run(runnnerParams, addOnsParams);
+    ImmApp::Run(runnerParams, addOnsParams);
 
     app_deinit(g_app);
 
