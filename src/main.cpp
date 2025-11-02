@@ -8,7 +8,6 @@
 
 #include "assert.h"
 
-#include "dummy_midi_interface.hpp"
 #include "jack_midi_interface.hpp"
 
 using HelloImGui::Log;
@@ -20,6 +19,8 @@ using HelloImGui::LogLevel;
 
 #define CONTROL_CHANGE_ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 #define CONTROL_CHANGE_ENUM_STRING(NAME, VALUE) case NAME: return #NAME;
+
+#define ARRAY_SIZE(X) (sizeof(X) / (sizeof(*(X))))
 
 enum ControlChange {
     CONTROL_CHANGE_ENUM(CONTROL_CHANGE_ENUM_VARIANT)
@@ -39,6 +40,7 @@ struct Filter {
 };
 
 struct Program {
+    char name[9];
     Filter filter_1;
 };
 
@@ -67,7 +69,7 @@ bool app_init(App& out_app) {
         return false;
     }
 
-    Log(LogLevel::Error, "Successfully initialized app");
+    Log(LogLevel::Info, "Successfully initialized app");
 
     return true;
 }
@@ -77,18 +79,24 @@ void app_deinit(App& app) {
 
     app.midi->deinit();
 
-    Log(LogLevel::Error, "Successfully deinitialized app");
+    Log(LogLevel::Info, "Successfully deinitialized app");
 }
 
-void parameter_knob(int& param, ControlChange cc) {
-    if (ImGuiKnobs::KnobInt(control_change_name(cc), &param, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
-        g_app.midi->send_control_change(cc, param);
+void parameter_knob(int& value, ControlChange cc) {
+    if (ImGuiKnobs::KnobInt(control_change_name(cc), &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
+        g_app.midi->send_control_change(cc, value);
+    }
+}
+
+void parameter_knob_ex(int& value, ParamEx param, const char* name) {
+    if (ImGuiKnobs::KnobInt(name, &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
+        g_app.midi->send_control_change_ex(param, value);
     }
 }
 
 void filter_gui(Filter& filter, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(filter.cutoff, CC_FILTER1_CUTOFF);
+        parameter_knob_ex(filter.cutoff, {0x11, 0x32}, control_change_name(CC_FILTER1_CUTOFF));
         ImGui::SameLine();
         parameter_knob(filter.resonance, CC_FILTER1_RESO);
     }
@@ -97,15 +105,51 @@ void filter_gui(Filter& filter, const char* window_name) {
 }
 
 void program_gui(Program& program) {
+    if (ImGui::Begin("Program")) {
+        if (ImGui::InputText("Name", program.name, ARRAY_SIZE(program.name), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            for (uint16_t i = 0; i < ARRAY_SIZE(program.name) - 1; i++) {
+                g_app.midi->send_control_change_ex({0, i}, program.name[i]);
+            }
+        }
+    }
+
+    ImGui::End(); // Begin
+
     filter_gui(program.filter_1, "Filter 1");
 }
 
 void app_gui() {
     program_gui(g_app.program);
 
+    if (ImGui::Begin("Logs")) {
+        HelloImGui::LogGui();
+    }
+
+    ImGui::End(); // Begin
+
 #ifndef NDEBUG
     ImGui::ShowDemoWindow();
 #endif
+}
+
+void app_menu_bar_gui() {
+    if (ImGui::BeginMenu("MIDI")) {
+        if (ImGui::MenuItem("Request Current Program Dump")) {
+            bool ok = g_app.midi->send_cur_program_dump_req();
+            if (!ok) {
+                Log(LogLevel::Error, "Failed to send current program dump request");
+            }
+        }
+
+        ImGui::EndMenu();
+    }
+}
+
+void app_pre_frame() {
+    bool ok = g_app.midi->handle_received_data();
+    if (!ok) {
+        Log(LogLevel::Error, "Failed to handle received data");
+    }
 }
 
 int main(int, char *[]) {
@@ -123,6 +167,9 @@ int main(int, char *[]) {
     runnerParams.imGuiWindowParams.showMenuBar = true;
     runnerParams.imGuiWindowParams.showStatus_Fps = true;
     runnerParams.callbacks.ShowGui = app_gui;
+    runnerParams.callbacks.PreNewFrame = app_pre_frame;
+    runnerParams.callbacks.ShowMenus = app_menu_bar_gui;
+    runnerParams.fpsIdling.enableIdling = false;
 
     runnerParams.appWindowParams.windowTitle = "MicroKORG XL Controller";
     runnerParams.appWindowParams.windowGeometry = { .size = {600, 800} };
