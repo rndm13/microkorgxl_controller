@@ -8,6 +8,7 @@
 
 #include "assert.h"
 
+#include "program.hpp"
 #include "jack_midi_interface.hpp"
 
 using HelloImGui::Log;
@@ -34,18 +35,9 @@ const char* control_change_name(ControlChange cc) {
     return "";
 }
 
-struct Filter {
-    int cutoff;
-    int resonance;
-};
-
-struct Program {
-    char name[9];
-    Filter filter_1;
-};
-
 struct App {
     Program program;
+    Timbre* selected_timbre;
     MidiInterface* midi;
 };
 
@@ -68,6 +60,8 @@ bool app_init(App& out_app) {
 
         return false;
     }
+
+    out_app.selected_timbre = &out_app.program.timbre_1;
 
     Log(LogLevel::Info, "Successfully initialized app");
 
@@ -104,6 +98,10 @@ void filter_gui(Filter& filter, const char* window_name) {
     ImGui::End(); // Begin
 }
 
+void timbre_gui(Timbre& timbre) {
+    filter_gui(timbre.filter_1, "Filter 1");
+}
+
 void program_gui(Program& program) {
     if (ImGui::Begin("Program")) {
         if (ImGui::InputText("Name", program.name, ARRAY_SIZE(program.name), ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -114,12 +112,11 @@ void program_gui(Program& program) {
     }
 
     ImGui::End(); // Begin
-
-    filter_gui(program.filter_1, "Filter 1");
 }
 
 void app_gui() {
     program_gui(g_app.program);
+    timbre_gui(*g_app.selected_timbre);
 
     if (ImGui::Begin("Logs")) {
         HelloImGui::LogGui();

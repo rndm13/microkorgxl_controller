@@ -56,6 +56,7 @@ imgui_bundle_add_app(microkorgxl_controller
     src/main.cpp
     src/dummy_midi_interface.cpp
     src/jack_midi_interface.cpp
+    src/program.cpp
 )
 
 include_directories(microkorgxl_controller ${JACK_INCLUDE_DIRS})
