@@ -11,6 +11,7 @@
 #include "program.hpp"
 #include "jack_midi_interface.hpp"
 #include "settings.hpp"
+#include <cmath>
 
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
@@ -56,23 +57,101 @@ void app_deinit(App& app) {
     Log(LogLevel::Info, "Successfully deinitialized app");
 }
 
-void parameter_knob(int& value, ControlChange cc) {
-    if (ImGuiKnobs::KnobInt(control_change_name(cc), &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
+static ParamEx timbre_ex(ParamEx param) {
+    param.param_id = 0xFF00 & param.param_id;
+
+    int16_t timbre_id = TIMBRE_1_ID;
+    if (g_app.selected_timbre == &g_app.program.timbre_2) {
+        timbre_id = TIMBRE_2_ID;
+    }
+
+    param.param_id |= timbre_id;
+
+    return param;
+}
+
+void parameter_knob(int& value, ControlChange cc, const char* name = NULL) {
+    if (name == NULL) {
+        name = control_change_name(cc);
+    }
+
+    if (ImGuiKnobs::KnobInt(name, &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
         g_app.midi->send_control_change(cc, value);
     }
 }
 
-void parameter_knob_ex(int& value, ParamEx param, const char* name) {
+void parameter_knob(int& value, ParamEx param, const char* name) {
     if (ImGuiKnobs::KnobInt(name, &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
         g_app.midi->send_control_change_ex(param, value);
     }
 }
 
+#define FILTER_TYPE_BAL_COMBO_VARIANT(NAME, VALUE)                             \
+    {                                                                          \
+        bool is_selected = filter_type_balance_eq(value, NAME);                \
+        if (ImGui::Selectable(filter_type_balance_name(NAME), is_selected)) {  \
+            value = NAME;                                                      \
+            g_app.midi->send_control_change_ex(param, value);                  \
+        }                                                                      \
+        if (is_selected) {                                                     \
+            ImGui::SetItemDefaultFocus();                                      \
+        }                                                                      \
+    }
+
+void filter_balance_combo(FilterTypeBalance& value, ParamEx param, const char* name) {
+    if (ImGui::BeginCombo(name, filter_type_balance_name(value))) {
+        FILTER_TYPE_BAL_ENUM(FILTER_TYPE_BAL_COMBO_VARIANT);
+        ImGui::EndCombo();
+    }
+}
+
+void filter_graph_gui(Filter& filter) {
+    float y[128] = {0};
+    float cutoff = filter.cutoff;
+    float resonance = filter.resonance;
+
+    ImVec2 size = {-1, 80};
+    if (filter.balance == FTB_THRU) {
+        ImGui::Button("Disabled", size);
+        return;
+    }
+
+    float res_div = 64;
+    float min_res = 24;
+    if (filter.balance == FTB_24LPF) {
+        min_res = 48;
+        res_div = 48;
+    }
+
+    for (size_t x = 0; x < ARRAY_SIZE(y); x++) {
+        float parab = resonance -
+            powf((-static_cast<float>(x) + cutoff) * fmax(resonance, min_res) / res_div, 2);
+
+        y[x] = parab;
+        if (filter.balance == FTB_HPF) {
+            if (x > cutoff) {
+                y[x] = fmax(0, parab);
+            }
+        }
+
+        if (filter.balance == FTB_24LPF || filter.balance == FTB_12LPF) {
+            if (x < cutoff) {
+                y[x] = fmax(0, parab);
+            }
+        }
+    }
+
+    ImGui::PlotLines("##FILTER_PLOT", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
+}
+
 void filter_gui(Filter& filter, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob_ex(filter.cutoff, {0x11, 0x32}, control_change_name(CC_FILTER1_CUTOFF));
+        filter_graph_gui(filter);
+
+        filter_balance_combo(filter.balance, timbre_ex({0, 0x31}), control_change_name(CC_FILTER1_TYPE_BAL));
+        parameter_knob(filter.cutoff, timbre_ex({0, 0x32}), control_change_name(CC_FILTER1_CUTOFF));
         ImGui::SameLine();
-        parameter_knob(filter.resonance, CC_FILTER1_RESO);
+        parameter_knob(filter.resonance, timbre_ex({0, 0x33}), control_change_name(CC_FILTER1_RESO));
     }
 
     ImGui::End(); // Begin
