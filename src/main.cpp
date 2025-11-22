@@ -29,7 +29,7 @@ using HelloImGui::LogLevel;
     VARIANT(CC_FILTER1_ROUTING1, 26)                                 \
     VARIANT(CC_FILTER1_EG1_INT, 79)                                  \
     VARIANT(CC_OSC1_WAVE, 8)                                         \
-    VARIANT(CC_OSC1_OSC_MODE, 9)                                     \
+    VARIANT(CC_OSC1_OSC_MOD, 9)                                      \
     VARIANT(CC_OSC1_OSC1C1, 15)                                      \
     VARIANT(CC_OSC1_OSC1C2, 17)                                      \
     VARIANT(CC_UNISON_MODE, 3)                                       \
@@ -203,18 +203,18 @@ struct Amp {
     int panpot;
 };
 
-struct Drive_ws {
+struct DriveWS {
     int ws_depth;
 };
 
-struct Envelope_Generator {
+struct EnvelopeGenerator {
     int attack;
     int decay;
     int sustain;
     int release;
 };
 
-struct Low_Frequency_Oscillator {
+struct LFO {
     int wave;
     int freq;
 };
@@ -228,7 +228,7 @@ struct Equalizer {
     int hi_gain;
 };
 
-struct Master_Effects {
+struct effect {
     int dry_wet;
     int ctrl_1;
     int ctrl_2;
@@ -240,12 +240,12 @@ struct Program {
     Unison unison;
     Mixer mixer;
     Amp amp;
-    Drive_ws drive_ws;
-    Envelope_Generator eg_1;
-    Low_Frequency_Oscillator lfo_1;
+    DriveWS drive_ws;
+    EnvelopeGenerator eg_1;
+    LFO lfo_1;
     Patch patch_1;
     Equalizer eq;
-    Master_Effects mst_fx_1;
+    effect effect_1;
 };
 
 struct App {
@@ -342,7 +342,7 @@ void amp_gui(Amp& amp, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void drive_gui(Drive_ws& drive_ws, const char* window_name) {
+void drive_gui(DriveWS& drive_ws, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(drive_ws.ws_depth, CC_DRIVE_WS_WS_DEPTH);
     }
@@ -350,7 +350,7 @@ void drive_gui(Drive_ws& drive_ws, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
+void envelopegenerator_gui(EnvelopeGenerator& eg_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(eg_1.attack, CC_EG1_ATTACK);
         ImGui::SameLine();
@@ -364,7 +364,7 @@ void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void low_frequency_oscillator_gui(Low_Frequency_Oscillator& lfo_1, const char* window_name) {
+void lfo_gui(LFO& lfo_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(lfo_1.wave, CC_LFO1_WAVE);
         ImGui::SameLine();
@@ -392,13 +392,13 @@ void equalizer_gui(Equalizer& eq, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void master_effects_gui(Master_Effects& mst_fx_1, const char* window_name) {
+void effect_gui(Effect& effect_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(mst_fx_1.dry_wet, CC_MST_FX1_DRY_WET);
+        parameter_knob(effect_1.dry_wet, CC_MST_FX1_DRY_WET);
         ImGui::SameLine();
-        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_1);
+        parameter_knob(effect_1.ctrl_1, CC_MST_FX1_CTRL_1);
         ImGui::SameLine();
-        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_2);
+        parameter_knob(effect_2.ctrl_2, CC_MST_FX1_CTRL_2);
     }
 
     ImGui::End(); // Begin
@@ -411,11 +411,11 @@ void program_gui(Program& program) {
     mixer_gui(program.mixer, "Mixer");
     amp_gui(program.amp, "Amp");
     drive_gui(program.drive_ws, "Drive/Ws");
-    envelope_generator_gui(program.eg_1, "Envelope generator");
-    low_frequency_oscillator_gui(program.lfo_1, "Low Frequency Oscillator");
+    envelopegenerator_gui(program.eg_1, "Envelope generator");
+    lfo_gui(program.lfo_1, "Low Frequency Oscillator");
     patch_gui(program.patch_1, "Patch 1");
     equalizer_gui(program.eq, "Equalizer");
-    master_effects_gui(program.mst_fx_1, "Master effects");
+    effect_gui(program.effect_1, "Master effect");
 }
 
 void app_gui() {
