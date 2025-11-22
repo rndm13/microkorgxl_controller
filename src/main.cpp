@@ -70,6 +70,7 @@ static ParamEx timbre_ex(ParamEx param) {
     return param;
 }
 
+// TODO: change value parameter to be a pointer (to match parameter_enum)
 void parameter_knob(int& value, ControlChange cc, const char* name = NULL) {
     if (name == NULL) {
         name = control_change_name(cc);
@@ -86,21 +87,35 @@ void parameter_knob(int& value, ParamEx param, const char* name) {
     }
 }
 
-#define FILTER_TYPE_BAL_COMBO_VARIANT(NAME, VALUE)                             \
-    {                                                                          \
-        bool is_selected = filter_type_balance_eq(value, NAME);                \
-        if (ImGui::Selectable(filter_type_balance_name(NAME), is_selected)) {  \
-            value = NAME;                                                      \
-            g_app.midi->send_control_change_ex(param, value);                  \
-        }                                                                      \
-        if (is_selected) {                                                     \
-            ImGui::SetItemDefaultFocus();                                      \
-        }                                                                      \
+struct EnumElem {
+    int value;
+    const char* name;
+};
+
+#define ENUM_ARR_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
+
+void parameter_enum(int* value, ParamEx param, const char* name, const EnumElem* enum_arr, size_t enum_arr_size) {
+    size_t value_idx = 0;
+
+    for (ssize_t i = enum_arr_size - 1; i > 0; i--) {
+        if (*value >= enum_arr[i].value) {
+            *value = enum_arr[i].value;
+            value_idx = i;
+            break;
+        }
     }
 
-void filter_balance_combo(FilterTypeBalance& value, ParamEx param, const char* name) {
-    if (ImGui::BeginCombo(name, filter_type_balance_name(value))) {
-        FILTER_TYPE_BAL_ENUM(FILTER_TYPE_BAL_COMBO_VARIANT);
+    if (ImGui::BeginCombo(name, enum_arr[value_idx].name)) {
+        for (size_t i = 0; i < enum_arr_size; i++) {
+            bool is_selected = value_idx == i;
+            if (ImGui::Selectable(enum_arr[i].name, is_selected)) {
+                *value = enum_arr[i].value;
+                g_app.midi->send_control_change_ex(param, *value);
+            }
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
         ImGui::EndCombo();
     }
 }
@@ -145,10 +160,14 @@ void filter_graph_gui(Filter& filter) {
 }
 
 void filter_gui(Filter& filter, const char* window_name) {
+    static const EnumElem enum_elems[] = {
+        FILTER_TYPE_BAL_ENUM(ENUM_ARR_VARIANT)
+    };
+
     if (ImGui::Begin(window_name)) {
         filter_graph_gui(filter);
 
-        filter_balance_combo(filter.balance, timbre_ex({0, 0x31}), control_change_name(CC_FILTER1_TYPE_BAL));
+        parameter_enum((int*)&filter.balance, timbre_ex({0, 0x31}), "Balance Type", enum_elems, ARRAY_SIZE(enum_elems));
         parameter_knob(filter.cutoff, timbre_ex({0, 0x32}), control_change_name(CC_FILTER1_CUTOFF));
         ImGui::SameLine();
         parameter_knob(filter.resonance, timbre_ex({0, 0x33}), control_change_name(CC_FILTER1_RESO));

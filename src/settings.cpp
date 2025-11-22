@@ -20,12 +20,6 @@ static FilterTypeBalance filter_type_balance_normalize(FilterTypeBalance ftb) {
     return FTB_THRU;
 }
 
-bool filter_type_balance_eq(FilterTypeBalance a, FilterTypeBalance b) {
-    a = filter_type_balance_normalize(a);
-    b = filter_type_balance_normalize(b);
-    return a == b;
-}
-
 #define CONTROL_CHANGE_ENUM_STRING(NAME, VALUE) case NAME: return #NAME;
 
 const char* control_change_name(ControlChange cc) {
