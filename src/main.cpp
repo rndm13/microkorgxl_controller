@@ -220,7 +220,7 @@ void oscillator_gui(Oscillator& osc, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(osc.wave, CC_OSC1_WAVE);
         ImGui::SameLine();
-        parameter_knob(osc.osc_mode, CC_OSC1_OSC_MODE);
+        parameter_knob(osc.osc_mod, CC_OSC1_OSC_MOD);
         ImGui::SameLine();
         parameter_knob(osc.osc1c1, CC_OSC1_OSC1C1);
         ImGui::SameLine();
@@ -258,7 +258,7 @@ void amp_gui(Amp& amp, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void drive_gui(Drive_ws& drive_ws, const char* window_name) {
+void drive_gui(DriveWS& drive_ws, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(drive_ws.ws_depth, CC_DRIVE_WS_WS_DEPTH);
     }
@@ -266,7 +266,7 @@ void drive_gui(Drive_ws& drive_ws, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
+void eg_gui(EnvelopeGenerator& eg_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(eg_1.attack, CC_EG1_ATTACK);
         ImGui::SameLine();
@@ -280,7 +280,7 @@ void envelope_generator_gui(Envelope_Generator& eg_1, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void low_frequency_oscillator_gui(Low_Frequency_Oscillator& lfo_1, const char* window_name) {
+void lfo_gui(LFO& lfo_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(lfo_1.wave, CC_LFO1_WAVE);
         ImGui::SameLine();
@@ -308,13 +308,13 @@ void equalizer_gui(Equalizer& eq, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void master_effects_gui(Master_Effects& mst_fx_1, const char* window_name) {
+void effect_gui(Effect& effect_1, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(mst_fx_1.dry_wet, CC_MST_FX1_DRY_WET);
+        parameter_knob(effect_1.dry_wet, CC_MST_FX1_DRY_WET);
         ImGui::SameLine();
-        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_1);
+        parameter_knob(effect_1.ctrl_1, CC_MST_FX1_CTRL_1);
         ImGui::SameLine();
-        parameter_knob(mst_fx_1.ctrl_1, CC_MST_FX1_CTRL_2);
+        parameter_knob(effect_1.ctrl_2, CC_MST_FX1_CTRL_2);
     }
 
     ImGui::End(); // Begin
@@ -329,11 +329,11 @@ void timbre_gui(Timbre& timbre) {
     mixer_gui(timbre.mixer, "Mixer");
     amp_gui(timbre.amp, "Amp");
     drive_gui(timbre.drive_ws, "Drive/Ws");
-    envelope_generator_gui(timbre.eg_1, "Envelope generator");
-    low_frequency_oscillator_gui(timbre.lfo_1, "Low Frequency Oscillator");
+    eg_gui(timbre.eg_1, "Envelope generator");
+    lfo_gui(timbre.lfo_1, "Low Frequency Oscillator");
     patch_gui(timbre.patch_1, "Patch 1");
     equalizer_gui(timbre.eq, "Equalizer");
-    master_effects_gui(timbre.mst_fx_1, "Master effects");
+    effect_gui(timbre.mst_fx_1, "Effect 1");
 }
 
 void program_gui(Program& program) {

@@ -16,7 +16,7 @@ struct Filter {
 
 struct Oscillator {
     int wave;
-    int osc_mode;
+    int osc_mod;
     int osc1c1;
     int osc1c2;
 };
@@ -35,18 +35,18 @@ struct Amp {
     int panpot;
 };
 
-struct Drive_ws {
+struct DriveWS {
     int ws_depth;
 };
 
-struct Envelope_Generator {
+struct EnvelopeGenerator {
     int attack;
     int decay;
     int sustain;
     int release;
 };
 
-struct Low_Frequency_Oscillator {
+struct LFO {
     int wave;
     int freq;
 };
@@ -60,7 +60,7 @@ struct Equalizer {
     int hi_gain;
 };
 
-struct Master_Effects {
+struct Effect {
     int dry_wet;
     int ctrl_1;
     int ctrl_2;
@@ -74,12 +74,12 @@ struct Timbre {
     Unison unison;
     Mixer mixer;
     Amp amp;
-    Drive_ws drive_ws;
-    Envelope_Generator eg_1;
-    Low_Frequency_Oscillator lfo_1;
+    DriveWS drive_ws;
+    EnvelopeGenerator eg_1;
+    LFO lfo_1;
     Patch patch_1;
     Equalizer eq;
-    Master_Effects mst_fx_1;
+    Effect mst_fx_1;
 };
 
 struct Program {

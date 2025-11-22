@@ -36,7 +36,7 @@ const char* filter_type_balance_name(FilterTypeBalance ftb);
     VARIANT(CC_FILTER1_ROUTING1, 26)                                 \
     VARIANT(CC_FILTER1_EG1_INT, 79)                                  \
     VARIANT(CC_OSC1_WAVE, 8)                                         \
-    VARIANT(CC_OSC1_OSC_MODE, 9)                                     \
+    VARIANT(CC_OSC1_OSC_MOD, 9)                                      \
     VARIANT(CC_OSC1_OSC1C1, 15)                                      \
     VARIANT(CC_OSC1_OSC1C2, 17)                                      \
     VARIANT(CC_UNISON_MODE, 3)                                       \
@@ -57,6 +57,7 @@ const char* filter_type_balance_name(FilterTypeBalance ftb);
     VARIANT(CC_MST_FX1_DRY_WET, 115)                                 \
     VARIANT(CC_MST_FX1_CTRL_1, 12)                                   \
     VARIANT(CC_MST_FX1_CTRL_2, 112)                                  \
+
 
 #define CONTROL_CHANGE_ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 
