@@ -6,8 +6,8 @@
 #include "imgui-knobs/imgui-knobs.h"
 #include "portable_file_dialogs/portable_file_dialogs.h"
 
-#include "stdint.h"
 #include "math.h"
+#include "stdint.h"
 #include "assert.h"
 #include "stdio.h"
 
@@ -15,10 +15,15 @@
 #include "jack_midi_interface.hpp"
 #include "settings.hpp"
 
+#include "imgui_test_engine/imgui_te_context.h"
+
+#include "imgui_test_engine/imgui_te_engine.h"
+#include "imgui_test_engine/imgui_te_ui.h"
+
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
 
-// TODO: Update all de/serialization with conversion of +/- parameters
+#define ENUM_SEL(NAME) "**/###" #NAME
 
 #define GRAPH_SIZE ImVec2{320, 80}
 
@@ -183,26 +188,26 @@ void filter_graph_gui(Filter* filter, size_t idx) {
     float resonance = filter->resonance;
     Filter1TypeBalance type_bal = static_cast<Filter1TypeBalance>(filter->type_bal);
 
-    const float res_div = type_bal == FTB_24LPF ? 48 : 64;
-    const float min_res = type_bal == FTB_24LPF ? 48 : 24;
+    const float res_div = type_bal == FTB1_24LPF ? 48 : 64;
+    const float min_res = type_bal == FTB1_24LPF ? 48 : 24;
 
     if (idx >= 1) {
         switch (filter->type_bal) {
             case FTB2_12LPF:
-                type_bal = FTB_12LPF;
+                type_bal = FTB1_12LPF;
                 break;
             case FTB2_HPF:
-                type_bal = FTB_HPF;
+                type_bal = FTB1_HPF;
                 break;
             case FTB2_BPF:
-                type_bal = FTB_BPF;
+                type_bal = FTB1_BPF;
                 break;
             default:
-                type_bal = FTB_THRU;
+                type_bal = FTB1_THRU;
         }
     }
 
-    if (type_bal == FTB_THRU) {
+    if (type_bal == FTB1_THRU) {
         ImGui::Button("Disabled", GRAPH_SIZE);
         return;
     }
@@ -212,13 +217,13 @@ void filter_graph_gui(Filter* filter, size_t idx) {
             powf((-static_cast<float>(x) + cutoff) * fmax(resonance, min_res) / res_div, 2);
 
         y[x] = parab;
-        if (type_bal == FTB_HPF) {
+        if (type_bal == FTB1_HPF) {
             if (x > cutoff) {
                 y[x] = fmax(0, parab);
             }
         }
 
-        if (type_bal == FTB_24LPF || type_bal == FTB_12LPF) {
+        if (type_bal == FTB1_24LPF || type_bal == FTB1_12LPF) {
             if (x < cutoff) {
                 y[x] = fmax(0, parab);
             }
@@ -758,24 +763,24 @@ void timbre_gui(Timbre* timbre) {
     filter_gui(&timbre->filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(&timbre->filter_arr[1], "Filter 2###filter2", 1);
 
-    oscillator_gui(&timbre->osc_arr[0], "Oscillator 1", 0);
-    oscillator_gui(&timbre->osc_arr[1], "Oscillator 2", 1);
-    unison_gui(&timbre->unison, "Unison");
+    oscillator_gui(&timbre->osc_arr[0], "Oscillator 1###osc1", 0);
+    oscillator_gui(&timbre->osc_arr[1], "Oscillator 2###osc2", 1);
+    unison_gui(&timbre->unison, "Unison###unison");
 
-    mixer_gui(&timbre->mixer, "Mixer");
-    equalizer_gui(&timbre->eq, "Equalizer");
-    amp_gui(&timbre->amp, "Amp");
+    mixer_gui(&timbre->mixer, "Mixer###mixer");
+    equalizer_gui(&timbre->eq, "Equalizer###eq");
+    amp_gui(&timbre->amp, "Amp###amp");
 
-    eg_gui(&timbre->eg_arr[0], "Envelope generator 1", 0);
-    eg_gui(&timbre->eg_arr[1], "Envelope generator 2", 1);
-    eg_gui(&timbre->eg_arr[2], "Envelope generator 3", 2);
+    eg_gui(&timbre->eg_arr[0], "Envelope generator 1###eg1", 0);
+    eg_gui(&timbre->eg_arr[1], "Envelope generator 2###eg2", 1);
+    eg_gui(&timbre->eg_arr[2], "Envelope generator 3###eg3", 2);
 
-    lfo_gui(&timbre->lfo_arr[0], "Low Frequency Oscillator 1", 0);
-    lfo_gui(&timbre->lfo_arr[1], "Low Frequency Oscillator 2", 1);
+    lfo_gui(&timbre->lfo_arr[0], "Low Frequency Oscillator 1###lfo1", 0);
+    lfo_gui(&timbre->lfo_arr[1], "Low Frequency Oscillator 2###lfo2", 1);
 
-    patch_gui(timbre, "Patches");
+    patch_gui(timbre, "Patches###patch");
 
-    pitch_gui(&timbre->pitch, "Pitch Settings");
+    pitch_gui(&timbre->pitch, "Pitch Settings###pitch");
 
     pop_timbre_params();
 }
@@ -824,16 +829,16 @@ void program_gui(Program* program) {
     ImGui::End(); // Begin
 
     if (open_pitch) {
-        ImGui::OpenPopup("Pitch Settings");
+        ImGui::OpenPopup("Pitch Settings###pitch");
     }
 
     if (open_patch) {
-        ImGui::OpenPopup("Patches");
+        ImGui::OpenPopup("Patches###patch");
     }
 
-    program_data_gui(&g_app.program, "Program Settings");
+    program_data_gui(&g_app.program, "Program Settings###program_data");
     if (open_program_data) {
-        ImGui::OpenPopup("Program Settings");
+        ImGui::OpenPopup("Program Settings###program_data");
     }
 }
 
@@ -848,13 +853,12 @@ void app_gui() {
     ImGui::PopStyleColor();
     ImGui::PopFont();
 
-    if (ImGui::Begin("Logs")) {
-        HelloImGui::LogGui();
-    }
-    ImGui::End(); // Begin
-
 #ifndef NDEBUG
     ImGui::ShowDemoWindow();
+#endif
+#ifndef NDEBUG
+    ImGuiTestEngine* e = HelloImGui::GetImGuiTestEngine();
+    ImGuiTestEngine_ShowTestEngineWindows(e, nullptr);
 #endif
 }
 
@@ -941,6 +945,112 @@ void load_fonts() {
     g_app.regular_font = HelloImGui::LoadFont("fonts/DroidSans.ttf", 12);
 }
 
+std::vector<HelloImGui::DockingSplit> splits() {
+    return {};
+}
+
+std::vector<HelloImGui::DockableWindow> windows() {
+    auto program_window = HelloImGui::DockableWindow(
+        "Program###program", "MainDockSpace", []() { program_gui(&g_app.program); });
+
+    auto logs_window = HelloImGui::DockableWindow(
+        "Logs###win_logs", "MainDockSpace", []() { HelloImGui::LogGui(); });
+
+    return {logs_window, program_window};
+}
+
+HelloImGui::DockingParams layout() {
+    HelloImGui::DockingParams params = {};
+
+    params.dockableWindows = {}; // windows();
+    params.dockingSplits = {}; // splits();
+
+    return params;
+}
+
+void register_tests() {
+    ImGuiTestEngine* e = HelloImGui::GetImGuiTestEngine();
+
+    App orig_app = g_app;
+
+    static constexpr const char* root_sel = "//";
+    static constexpr const char* win_filter1_sel = "//###filter1";
+    static constexpr const char* win_filter2_sel = "//###filter2";
+    static constexpr const char* filt_type_bal_sel = "/###type_bal";
+    static constexpr const char* filt_cutoff_sel = "/###cutoff/###cutoff";
+    static constexpr const char* filt_resonance_sel = "/###resonance/###resonance";
+
+    auto enum_click = [](ImGuiTestContext* ctx, const char* win_sel, const char* enum_sel) {
+        ctx->SetRef(win_sel);
+        ctx->SetRef(enum_sel);
+
+        ctx->ItemClick("");
+        ctx->SetRef(root_sel);
+    };
+
+    ImGuiTest* filter_1__balance_type = IM_REGISTER_TEST(e, "filter_1", "balance_type");
+    filter_1__balance_type->TestFunc = [&](ImGuiTestContext* ctx) {
+        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB1_24LPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_24LPF);
+
+        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB1_12LPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_12LPF);
+
+        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB1_HPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_HPF);
+
+        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB1_BPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_BPF);
+
+        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB1_THRU));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_THRU);
+    };
+
+    ImGuiTest* filter_1__cutoff = IM_REGISTER_TEST(e, "filter_1", "cutoff");
+    filter_1__cutoff->TestFunc = [&](ImGuiTestContext* ctx) {
+        ctx->SetRef(win_filter1_sel);
+        ctx->SetRef(filt_cutoff_sel);
+
+        ctx->ItemDragWithDelta("", {0, 130});
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].cutoff, 0);
+
+        ctx->ItemDragWithDelta("", {0, -130});
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].cutoff, 127);
+    };
+
+    ImGuiTest* filter_1__resonance = IM_REGISTER_TEST(e, "filter_1", "resonance");
+    filter_1__resonance->TestFunc = [&](ImGuiTestContext* ctx) {
+        ctx->SetRef(win_filter1_sel);
+        ctx->SetRef(filt_resonance_sel);
+
+        ctx->ItemDragWithDelta("", {0, 130});
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].resonance, 0);
+
+        ctx->ItemDragWithDelta("", {0, -130});
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].resonance, 127);
+    };
+
+    ImGuiTest* filter_2__balance_type = IM_REGISTER_TEST(e, "filter_2", "balance_type");
+    filter_2__balance_type->TestFunc = [&](ImGuiTestContext* ctx) {
+        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB2_12LPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_12LPF);
+
+        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB2_HPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_HPF);
+
+        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
+        ctx->ItemClick(ENUM_SEL(FTB2_BPF));
+        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_BPF);
+    };
+}
+
 int main(int, char *[]) {
     bool ok = app_init(&g_app);
     if (!ok) {
@@ -952,24 +1062,33 @@ int main(int, char *[]) {
     HelloImGui::SetAssetsFolder(ASSETS_LOCATION);
 #endif
 
-    HelloImGui::RunnerParams runnerParams = {};
-    runnerParams.imGuiWindowParams.showMenuBar = true;
-    runnerParams.imGuiWindowParams.showStatus_Fps = true;
+    HelloImGui::RunnerParams runner_params;
+    runner_params.imGuiWindowParams.showMenuBar = true;
+    runner_params.imGuiWindowParams.showStatus_Fps = true;
+    runner_params.imGuiWindowParams.defaultImGuiWindowType =
+        HelloImGui::DefaultImGuiWindowType::ProvideFullScreenDockSpace;
 
-    runnerParams.callbacks.ShowGui = app_gui;
-    runnerParams.callbacks.PreNewFrame = app_pre_frame;
-    runnerParams.callbacks.ShowMenus = app_menu_bar_gui;
-    runnerParams.callbacks.LoadAdditionalFonts = load_fonts;
+    runner_params.fpsIdling.enableIdling = false;
 
-    runnerParams.fpsIdling.enableIdling = false;
+    runner_params.callbacks.ShowGui = app_gui;
+    runner_params.callbacks.PreNewFrame = app_pre_frame;
+    runner_params.callbacks.ShowMenus = app_menu_bar_gui;
+    runner_params.callbacks.LoadAdditionalFonts = load_fonts;
+    runner_params.callbacks.RegisterTests = register_tests;
 
-    runnerParams.appWindowParams.windowTitle = "MicroKORG XL Controller";
-    runnerParams.appWindowParams.windowGeometry = { .size = {600, 800} };
+    runner_params.fpsIdling.enableIdling = false;
 
-    ImmApp::AddOnsParams addOnsParams;
-    addOnsParams.withImplot = true;
+    runner_params.dockingParams = layout();
 
-    ImmApp::Run(runnerParams, addOnsParams);
+    runner_params.appWindowParams.windowTitle = "MicroKORG XL Controller";
+    runner_params.appWindowParams.windowGeometry = { .size = {600, 800} };
+
+    runner_params.useImGuiTestEngine = true;
+
+    ImmApp::AddOnsParams addons_params;
+    addons_params.withImplot = true;
+
+    ImmApp::Run(runner_params, addons_params);
 
     app_deinit(&g_app);
 

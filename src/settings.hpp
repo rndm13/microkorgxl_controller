@@ -14,11 +14,11 @@
 
 
 #define FILTER1_TYPE_BAL_ENUM(VARIANT)                               \
-    VARIANT(FTB_24LPF, 0)                                            \
-    VARIANT(FTB_12LPF, 31)                                           \
-    VARIANT(FTB_HPF, 63)                                             \
-    VARIANT(FTB_BPF, 95)                                             \
-    VARIANT(FTB_THRU, 127)                                           \
+    VARIANT(FTB1_24LPF, 0)                                           \
+    VARIANT(FTB1_12LPF, 31)                                          \
+    VARIANT(FTB1_HPF, 63)                                            \
+    VARIANT(FTB1_BPF, 95)                                            \
+    VARIANT(FTB1_THRU, 127)                                          \
 
 enum Filter1TypeBalance {
     FILTER1_TYPE_BAL_ENUM(ENUM_VARIANT)
@@ -270,7 +270,7 @@ struct EnumArr {
     size_t size;
 };
 
-#define ENUM_ELEM_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
+#define ENUM_ELEM_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME "###" #NAME },
 #define ENUM_ARR(ENUM)                                               \
 {                                                                    \
   .arr = {                                                           \
