@@ -12,10 +12,19 @@
     VARIANT(FTB_BPF, 95)                                             \
     VARIANT(FTB_THRU, 127)                                           \
 
+#define FILTER2_TYPE_BAL_ENUM(VARIANT)                               \
+    VARIANT(FTB2_12LPF, 0)                                           \
+    VARIANT(FTB2_HPF, 1)                                             \
+    VARIANT(FTB2_BPF, 2)                                             \
+
 #define FILTER_TYPE_BAL_ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 
 enum FilterTypeBalance {
     FILTER_TYPE_BAL_ENUM(FILTER_TYPE_BAL_ENUM_VARIANT)
+};
+
+enum Filter2TypeBalance {
+    FILTER2_TYPE_BAL_ENUM(FILTER_TYPE_BAL_ENUM_VARIANT)
 };
 
 const char* filter_type_balance_name(FilterTypeBalance ftb);

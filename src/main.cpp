@@ -5,13 +5,12 @@
 #include "imgui-knobs/imgui-knobs.h"
 
 #include "stdint.h"
-
+#include <math.h>
 #include "assert.h"
 
 #include "program.hpp"
 #include "jack_midi_interface.hpp"
 #include "settings.hpp"
-#include <cmath>
 
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
@@ -120,20 +119,37 @@ void parameter_enum(int* value, ParamEx param, const char* name, const EnumElem*
     }
 }
 
-void filter_graph_gui(Filter& filter) {
+void filter_graph_gui(Filter& filter, size_t filter_idx) {
     float y[128] = {0};
     float cutoff = filter.cutoff;
     float resonance = filter.resonance;
+    FilterTypeBalance balance = static_cast<FilterTypeBalance>(filter.balance);
+    if (filter_idx >= 1) {
+        switch (filter.balance) {
+            case FTB2_12LPF:
+                balance = FTB_12LPF;
+                break;
+            case FTB2_HPF:
+                balance = FTB_HPF;
+                break;
+            case FTB2_BPF:
+                balance = FTB_BPF;
+                break;
+            default:
+                balance = FTB_THRU;
+        }
+    }
 
     ImVec2 size = {-1, 80};
-    if (filter.balance == FTB_THRU) {
+
+    if (balance == FTB_THRU) {
         ImGui::Button("Disabled", size);
         return;
     }
 
     float res_div = 64;
     float min_res = 24;
-    if (filter.balance == FTB_24LPF) {
+    if (balance == FTB_24LPF) {
         min_res = 48;
         res_div = 48;
     }
@@ -143,13 +159,13 @@ void filter_graph_gui(Filter& filter) {
             powf((-static_cast<float>(x) + cutoff) * fmax(resonance, min_res) / res_div, 2);
 
         y[x] = parab;
-        if (filter.balance == FTB_HPF) {
+        if (balance == FTB_HPF) {
             if (x > cutoff) {
                 y[x] = fmax(0, parab);
             }
         }
 
-        if (filter.balance == FTB_24LPF || filter.balance == FTB_12LPF) {
+        if (balance == FTB_24LPF || balance == FTB_12LPF) {
             if (x < cutoff) {
                 y[x] = fmax(0, parab);
             }
@@ -159,29 +175,48 @@ void filter_graph_gui(Filter& filter) {
     ImGui::PlotLines("##FILTER_PLOT", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
 }
 
-void filter_gui(Filter& filter, const char* window_name) {
-    static const EnumElem enum_elems[] = {
+void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
+    static const ParamEx params[][2] = {
+        {{0, 0x31}, {0, 0x40}}, // Balance
+        {{0, 0x32}, {0, 0x42}}, // Cutoff
+        {{0, 0x33}, {0, 0x43}}, // Resonance
+        {{0, 0x34}, {0, 0x44}}, // EG Intensity
+        {{0, 0x35}, {0, 0x45}}, // Keyboard track
+        {{0, 0x36}, {0, 0x46}}, // Velocity sensitivity
+    };
+    static const EnumElem filter1_enum_elems[] = {
         FILTER_TYPE_BAL_ENUM(ENUM_ARR_VARIANT)
     };
+    static const EnumElem filter2_enum_elems[] = {
+        FILTER2_TYPE_BAL_ENUM(ENUM_ARR_VARIANT)
+    };
+
+    size_t enum_size = ARRAY_SIZE(filter1_enum_elems);
+    const EnumElem* enum_elems = filter1_enum_elems;
+    if (filter_idx == 1) {
+        enum_elems = filter2_enum_elems;
+        enum_size = ARRAY_SIZE(filter2_enum_elems);
+    }
 
     if (ImGui::Begin(window_name)) {
-        filter_graph_gui(filter);
+        filter_graph_gui(filter, filter_idx);
 
-        parameter_enum((int*)&filter.balance, timbre_ex({0, 0x31}), "Balance Type", enum_elems, ARRAY_SIZE(enum_elems));
-        parameter_knob(filter.cutoff, timbre_ex({0, 0x32}), control_change_name(CC_FILTER1_CUTOFF));
+        parameter_enum(&filter.balance,  timbre_ex(params[0][filter_idx]), "Balance Type###type_bal", enum_elems, enum_size);
+        parameter_knob(filter.cutoff,    timbre_ex(params[1][filter_idx]), control_change_name(CC_FILTER1_CUTOFF));
         ImGui::SameLine();
-        parameter_knob(filter.resonance, timbre_ex({0, 0x33}), control_change_name(CC_FILTER1_RESO));
+        parameter_knob(filter.resonance, timbre_ex(params[2][filter_idx]), control_change_name(CC_FILTER1_RESO));
     }
 
     ImGui::End(); // Begin
 }
 
 void timbre_gui(Timbre& timbre) {
-    filter_gui(timbre.filter_1, "Filter 1");
+    filter_gui(timbre.filter_arr[0], "Filter 1###filter1", 0);
+    filter_gui(timbre.filter_arr[1], "Filter 2###filter2", 1);
 }
 
 void program_gui(Program& program) {
-    if (ImGui::Begin("Program")) {
+    if (ImGui::Begin("Program###program")) {
         if (ImGui::InputText("Name", program.name, ARRAY_SIZE(program.name), ImGuiInputTextFlags_EnterReturnsTrue)) {
             for (uint16_t i = 0; i < ARRAY_SIZE(program.name) - 1; i++) {
                 g_app.midi->send_control_change_ex({0, i}, program.name[i]);

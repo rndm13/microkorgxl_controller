@@ -2,19 +2,18 @@
 
 #include <stdint.h>
 
-#include "settings.hpp"
-
 #define PROGRAM_SERIALIZED_SIZE      342
 #define PROGRAM_NAME_LENGTH          8
 
 struct Filter {
-    FilterTypeBalance balance;
+    int balance;
     int cutoff;
     int resonance;
 };
 
 struct Timbre {
-    Filter filter_1;
+    // Filter 2 doesn't have THRU, and LPF24
+    Filter filter_arr[2];
 };
 
 struct Program {
