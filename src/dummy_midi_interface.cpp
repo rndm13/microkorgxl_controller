@@ -6,7 +6,7 @@
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
 
-bool DummyMidi::handle_received_data() {
+bool DummyMidi::handle_received_data(Program* cur_program) {
     return true;
 }
 

@@ -202,7 +202,7 @@ void app_menu_bar_gui() {
 }
 
 void app_pre_frame() {
-    bool ok = g_app.midi->handle_received_data();
+    bool ok = g_app.midi->handle_received_data(&g_app.program);
     if (!ok) {
         Log(LogLevel::Error, "Failed to handle received data");
     }
