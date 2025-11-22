@@ -6,7 +6,12 @@
 #define EX_HEADER                             0xF042307E
 #define EX_CHANNEL_MASK                       0x00000F00
 
+#define EX_PROGRAM_DUMP_REQUEST_CODE          0x1C
+#define EX_PROGRAM_DUMP_CODE                  0x4C
+
 #define EX_CUR_PROGRAM_DUMP_REQUEST_CODE      0x10
+#define EX_CUR_PROGRAM_DUMP_CODE              0x40
+
 #define EX_CC_CODE                            0x41
 
 #define EX_END                                0xF7
@@ -84,17 +89,145 @@ static int process(jack_nframes_t nframes, void *arg) {
     return 0;
 }
 
-bool JACKMidi::handle_received_data() {
+static size_t convert_to_midi_data(jack_midi_data_t* buffer, ssize_t size) {
+    // TODO:
+
+    return 0;
+}
+
+static size_t convert_from_midi_data(jack_midi_data_t* buffer, ssize_t size) {
+    size_t result_size = 0;
+    for (size_t i = 0; i < size; i += 8) {
+        uint8_t data_arr[8] = {0};
+        size_t data_size = std::min(sizeof(data_arr), size - i);
+        memcpy(data_arr, &buffer[i], data_size);
+
+        uint8_t bits_7 = data_arr[0];
+
+        for (size_t j = 0; j < data_size - 1; j++) {
+            data_arr[j] = data_arr[j + 1] | ((bits_7 >> j) << 7);
+        }
+
+        memcpy(&buffer[result_size], data_arr, data_size - 1);
+        result_size += data_size - 1;
+    }
+
+    return result_size;
+}
+
+const jack_midi_data_t* JACKMidi::handle_received_program(
+        Program* cur_program,
+        const jack_midi_data_t* buffer,
+        ssize_t size) {
+    Log(LogLevel::Debug, "Handling received program");
+    for (size_t i = 0; i < size; i++) {
+        if (buffer[i] == EX_END) {
+            this->program_buffer_size = convert_from_midi_data(this->program_buffer, this->program_buffer_size);
+
+            Log(LogLevel::Debug, "PROGRAM DUMP:");
+            debug_dump_bytes(this->program_buffer, this->program_buffer_size);
+
+            switch (this->state) {
+                case JMS_DOWNLOADING_CUR_PROGRAM_DATA:
+                    Log(LogLevel::Debug, "Program buffer size: %d", this->program_buffer_size);
+
+                    if (this->program_buffer_size != PROGRAM_SERIALIZED_SIZE) {
+                        Log(LogLevel::Error, "Wrong program size %d", this->program_buffer_size);
+                        break;
+                    }
+
+                    program_deserialize(cur_program, this->program_buffer);
+                    break;
+                case JMS_DOWNLOADING_PROGRAM_DATA:
+                    // TODO:
+                    break;
+                case JMS_DOWNLOADING_GLOBAL_DATA:
+                    // TODO:
+                    break;
+                default:
+                    break;
+            }
+
+            this->state = JMS_RUNNING;
+            return &buffer[i + 1];
+        }
+
+        this->program_buffer[this->program_buffer_size++] = buffer[i];
+    }
+
+    return NULL;
+}
+
+const jack_midi_data_t* JACKMidi::handle_received_event_ex(const jack_midi_data_t* buffer, ssize_t size) {
+    // Handle exclusive events
+    Log(LogLevel::Debug, "Handling exclusive events");
+
+    if (size <= 0) {
+        return NULL;
+    }
+
+    switch (buffer[0]) {
+        case EX_CUR_PROGRAM_DUMP_CODE:
+            memset(this->program_buffer, 0, this->program_buffer_size);
+            this->program_buffer_size = 0;
+            this->state = JMS_DOWNLOADING_CUR_PROGRAM_DATA;
+            break;
+        case EX_PROGRAM_DUMP_CODE:
+            break;
+    }
+
+    buffer += 1;
+    size -= 1;
+
+    return buffer;
+}
+
+const jack_midi_data_t* JACKMidi::handle_received_event(
+        Program* cur_program,
+        const jack_midi_data_t* buffer,
+        ssize_t size) {
+    switch (this->state) {
+        case JMS_STOPPED:
+        case JMS_RUNNING:
+        case JMS_UPLOADING_PROGRAM_DATA:
+            break;
+        case JMS_DOWNLOADING_PROGRAM_DATA:
+        case JMS_DOWNLOADING_CUR_PROGRAM_DATA:
+        case JMS_DOWNLOADING_GLOBAL_DATA:
+            return this->handle_received_program(cur_program, buffer, size);
+            break;
+    }
+
+    uint32_t ex_header = 0;
+    if (size >= sizeof(ex_header)) {
+        memcpy(&ex_header, buffer, sizeof(ex_header));
+        ex_header = htobe32(ex_header);
+        if (ex_header == EX_HEADER) {
+            buffer += sizeof(ex_header);
+            size -= sizeof(ex_header);
+            return handle_received_event_ex(buffer, size);
+        }
+    }
+
+    return NULL;
+}
+
+bool JACKMidi::handle_received_data(Program* cur_program) {
     if (this->recv_buffer_size <= 0) {
         return true;
     }
 
-    Log(LogLevel::Debug, "RECEIVED BYTES:");
-    debug_dump_bytes(this->recv_buffer, this->recv_buffer_size);
+    const jack_midi_data_t* cur_event = this->recv_buffer;
+    ssize_t cur_size = this->recv_buffer_size;
+    while (cur_event != NULL) {
+        assert(cur_event < this->recv_buffer + this->recv_buffer_size);
+
+        cur_size = this->recv_buffer_size - (cur_event - this->recv_buffer);
+        cur_event = handle_received_event(cur_program, cur_event, cur_size);
+    }
 
     memset(this->recv_buffer, 0, this->recv_buffer_size);
     this->recv_buffer_size = 0;
-
     return true;
 }
 
@@ -195,6 +328,9 @@ bool JACKMidi::init() {
     }
 
     Log(LogLevel::Info, "JACK MIDI controller successfully initialized");
+
+    this->state = JMS_RUNNING;
+
     return true;
 err_port_out:
     jack_port_unregister(this->jack, this->jack_port_out);
@@ -210,6 +346,7 @@ void JACKMidi::deinit() {
     jack_port_unregister(this->jack, this->jack_port_out);
     jack_port_unregister(this->jack, this->jack_port_in);
     jack_client_close(this->jack);
+    this->state = JMS_STOPPED;
 
     Log(LogLevel::Info, "JACK MIDI controller successfully deinitialized");
 }
@@ -227,9 +364,6 @@ void JACKMidi::push_event() {
         event_data = this->send_buffer;
         event_size = this->send_buffer_size;
     }
-
-    Log(LogLevel::Debug, "WRITTEN BYTES:");
-    debug_dump_bytes(event_data, event_size);
 
     send_queue[this->send_queue_size++] = {
         .size = event_size,
@@ -257,7 +391,7 @@ static void debug_dump_bytes(uint8_t *bytes, size_t size) {
     size_t buffer_len = 0;
 
     for (size_t i = 0; i < size; i++) {
-        if (i % 4 == 0) {
+        if (i % 16 == 0) {
             Log(LogLevel::Debug, buffer);
             memset(buffer, 0, sizeof(buffer));
             buffer_len = 0;

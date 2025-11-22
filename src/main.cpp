@@ -217,6 +217,8 @@ void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
 }
 
 void oscillator_gui(Oscillator& osc, const char* window_name) {
+    // TODO: osc2 and wave select via a graph
+
     if (ImGui::Begin(window_name)) {
         parameter_knob(osc.wave, CC_OSC1_WAVE);
         ImGui::SameLine();
@@ -254,7 +256,7 @@ void mixer_gui(Mixer& mix, const char* window_name) {
 void amp_gui(Amp& amp, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         // TODO: More amp params...
-        parameter_knob(amp.level, timbre_ex({0, 0x50}), "Level###level");
+        parameter_knob(amp.lvl, timbre_ex({0, 0x50}), "Level###level");
         ImGui::SameLine();
         parameter_knob(amp.depth, timbre_ex({0, 0x54}), "Depth###depth");
         ImGui::SameLine();
@@ -332,7 +334,8 @@ void timbre_gui(Timbre& timbre) {
     filter_gui(timbre.filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(timbre.filter_arr[1], "Filter 2###filter2", 1);
 
-    oscillator_gui(timbre.osc_1, "Oscillator 1");
+    oscillator_gui(timbre.osc_arr[0], "Oscillator 1");
+    // oscillator_gui(timbre.osc_arr[1], "Oscillator 2");
     unison_gui(timbre.unison, "Unison");
 
     mixer_gui(timbre.mixer, "Mixer");
@@ -393,7 +396,7 @@ void app_menu_bar_gui() {
 }
 
 void app_pre_frame() {
-    bool ok = g_app.midi->handle_received_data();
+    bool ok = g_app.midi->handle_received_data(&g_app.program);
     if (!ok) {
         Log(LogLevel::Error, "Failed to handle received data");
     }
