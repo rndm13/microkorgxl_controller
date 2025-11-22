@@ -5,6 +5,8 @@
 #define PROGRAM_SERIALIZED_SIZE      342
 #define PROGRAM_NAME_LENGTH          8
 
+#define TIMBRE_NUM                   2
+
 struct Filter {
     int cutoff;
     int resonance;
@@ -85,9 +87,7 @@ struct Timbre {
 
 struct Program {
     char name[PROGRAM_NAME_LENGTH];
-    Timbre timbre_1;
-    Timbre timbre_2;
-    Effect fx_1;
+    Timbre timbre_arr[TIMBRE_NUM];
 };
 
 void program_deserialize(Program& out_prog, uint8_t* data);

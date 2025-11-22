@@ -41,7 +41,7 @@ bool app_init(App& out_app) {
         return false;
     }
 
-    out_app.selected_timbre = &out_app.program.timbre_1;
+    out_app.selected_timbre = &out_app.program.timbre_arr[0];
 
     Log(LogLevel::Info, "Successfully initialized app");
 
@@ -60,7 +60,7 @@ static ParamEx timbre_ex(ParamEx param) {
     param.param_id = 0xFF00 & param.param_id;
 
     int16_t timbre_id = TIMBRE_1_ID;
-    if (g_app.selected_timbre == &g_app.program.timbre_2) {
+    if (g_app.selected_timbre == &g_app.program.timbre_arr[1]) {
         timbre_id = TIMBRE_2_ID;
     }
 
