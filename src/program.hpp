@@ -20,7 +20,7 @@ struct Timbre {
 };
 
 struct Program {
-    char name[PROGRAM_NAME_LENGTH];
+    char name[PROGRAM_NAME_LENGTH + 1];
     Timbre timbre_arr[TIMBRE_NUM];
 };
 
