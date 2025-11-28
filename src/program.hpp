@@ -15,28 +15,28 @@ struct Filter {
 };
 
 struct Oscillator {
+    // Osc 2 has different type values
     int wave;
+    // Osc 2 has different ones
     int osc_mod;
-    int osc1c1;
-    int osc1c2;
+    // Osc2 doesn't have this
+    int control_arr[2];
 };
 
 struct Unison {
     int mode;
+    // TODO: Add detune, spread voice assign
 };
 
 struct Mixer {
-    int osc1_lvl;
+    int osc_lvl[2];
     int noise_lvl;
 };
 
 struct Amp {
     int level;
+    int depth;
     int panpot;
-};
-
-struct DriveWS {
-    int ws_depth;
 };
 
 struct EnvelopeGenerator {
@@ -44,6 +44,7 @@ struct EnvelopeGenerator {
     int decay;
     int sustain;
     int release;
+    int vel_sens;
 };
 
 struct LFO {
@@ -52,6 +53,8 @@ struct LFO {
 };
 
 struct Patch {
+    int src;
+    int dst;
     int intensty;
 };
 
@@ -74,18 +77,17 @@ struct Timbre {
     Unison unison;
     Mixer mixer;
     Amp amp;
-    DriveWS drive_ws;
-    EnvelopeGenerator eg_1;
-    LFO lfo_1;
-    Patch patch_1;
+    EnvelopeGenerator eg_arr[3];
+    LFO lfo_arr[2];
+    Patch patch_arr[6];
     Equalizer eq;
-    Effect mst_fx_1;
 };
 
 struct Program {
     char name[PROGRAM_NAME_LENGTH];
     Timbre timbre_1;
     Timbre timbre_2;
+    Effect fx_1;
 };
 
 void program_deserialize(Program& out_prog, uint8_t* data);

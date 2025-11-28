@@ -37,8 +37,8 @@ const char* filter_type_balance_name(FilterTypeBalance ftb);
     VARIANT(CC_FILTER1_EG1_INT, 79)                                  \
     VARIANT(CC_OSC1_WAVE, 8)                                         \
     VARIANT(CC_OSC1_OSC_MOD, 9)                                      \
-    VARIANT(CC_OSC1_OSC1C1, 15)                                      \
-    VARIANT(CC_OSC1_OSC1C2, 17)                                      \
+    VARIANT(CC_OSC1_C1, 15)                                          \
+    VARIANT(CC_OSC1_C2, 17)                                          \
     VARIANT(CC_UNISON_MODE, 3)                                       \
     VARIANT(CC_MIXER_OSC1_LVL, 23)                                   \
     VARIANT(CC_MIXER_NOISE_LVL, 25)                                  \

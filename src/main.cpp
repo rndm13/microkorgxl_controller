@@ -222,9 +222,9 @@ void oscillator_gui(Oscillator& osc, const char* window_name) {
         ImGui::SameLine();
         parameter_knob(osc.osc_mod, CC_OSC1_OSC_MOD);
         ImGui::SameLine();
-        parameter_knob(osc.osc1c1, CC_OSC1_OSC1C1);
+        parameter_knob(osc.control_arr[0], CC_OSC1_C1);
         ImGui::SameLine();
-        parameter_knob(osc.osc1c2, CC_OSC1_OSC1C2);
+        parameter_knob(osc.control_arr[1], CC_OSC1_C2);
     }
 
     ImGui::End(); // Begin
@@ -240,9 +240,12 @@ void unison_gui(Unison& unison, const char* window_name) {
 
 void mixer_gui(Mixer& mix, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(mix.osc1_lvl, CC_MIXER_OSC1_LVL);
+        // TODO: Vertical slider, also add osc2
+        parameter_knob(mix.osc_lvl[0], timbre_ex({0, 0x28}), "OSC1###osc1");
         ImGui::SameLine();
-        parameter_knob(mix.noise_lvl, CC_MIXER_NOISE_LVL);
+        parameter_knob(mix.osc_lvl[1], timbre_ex({0, 0x29}), "OSC2###osc2");
+        ImGui::SameLine();
+        parameter_knob(mix.noise_lvl, timbre_ex({0, 0x2A}), "NOISE###noise");
     }
 
     ImGui::End(); // Begin
@@ -250,52 +253,65 @@ void mixer_gui(Mixer& mix, const char* window_name) {
 
 void amp_gui(Amp& amp, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(amp.level, CC_AMP_LEVEL);
+        // TODO: More amp params...
+        parameter_knob(amp.level, timbre_ex({0, 0x50}), "Level###level");
         ImGui::SameLine();
-        parameter_knob(amp.panpot, CC_AMP_PANPOT);
+        parameter_knob(amp.depth, timbre_ex({0, 0x54}), "Depth###depth");
+        ImGui::SameLine();
+        parameter_knob(amp.panpot, timbre_ex({0, 0x55}), "Panpot###panpot");
     }
 
     ImGui::End(); // Begin
 }
 
-void drive_gui(DriveWS& drive_ws, const char* window_name) {
+void eg_gui(EnvelopeGenerator& eg, const char* window_name, size_t idx) {
+    const uint16_t param_mod = idx * 0x10;
+
+    const ParamEx params[] = {
+        {0, static_cast<uint16_t>(0x60 + param_mod)}, // Attack
+        {0, static_cast<uint16_t>(0x61 + param_mod)}, // Decay
+        {0, static_cast<uint16_t>(0x62 + param_mod)}, // Sustain
+        {0, static_cast<uint16_t>(0x63 + param_mod)}, // Release
+        {0, static_cast<uint16_t>(0x64 + param_mod)}, // Velocity sensitivity
+    };
+
     if (ImGui::Begin(window_name)) {
-        parameter_knob(drive_ws.ws_depth, CC_DRIVE_WS_WS_DEPTH);
+        parameter_knob(eg.attack, timbre_ex(params[0]), "Attack###attack");
+        ImGui::SameLine();
+        parameter_knob(eg.decay, timbre_ex(params[1]), "Decay###decay");
+        ImGui::SameLine();
+        parameter_knob(eg.sustain, timbre_ex(params[2]), "Sustain###sustain");
+        ImGui::SameLine();
+        parameter_knob(eg.release, timbre_ex(params[3]), "Release###release");
+        ImGui::SameLine();
+        parameter_knob(eg.vel_sens, timbre_ex(params[4]), "Velocity Sensitivity###vel_sens");
     }
 
     ImGui::End(); // Begin
 }
 
-void eg_gui(EnvelopeGenerator& eg_1, const char* window_name) {
+void lfo_gui(LFO& lfo, const char* window_name, size_t idx) {
+    const uint16_t param_mod = idx * 0x10;
+
+    const ParamEx params[] = {
+        {0, static_cast<uint16_t>(0x90 + param_mod)}, // Wave type
+        {0, static_cast<uint16_t>(0x92 + param_mod)}, // Frequency
+        {0, static_cast<uint16_t>(0x93 + param_mod)}, // BPS sync
+        {0, static_cast<uint16_t>(0x94 + param_mod)}, // Key sync
+        {0, static_cast<uint16_t>(0x96 + param_mod)}, // Note sync
+    };
+
     if (ImGui::Begin(window_name)) {
-        parameter_knob(eg_1.attack, CC_EG1_ATTACK);
+        parameter_knob(lfo.wave, timbre_ex(params[0]), "Wave###wave");
         ImGui::SameLine();
-        parameter_knob(eg_1.decay, CC_EG1_DECAY);
-        ImGui::SameLine();
-        parameter_knob(eg_1.sustain, CC_EG1_SUSTAIN);
-        ImGui::SameLine();
-        parameter_knob(eg_1.release, CC_EG1_RELEASE);
+        parameter_knob(lfo.freq, timbre_ex(params[1]), "Frequency###freq");
     }
 
     ImGui::End(); // Begin
 }
 
-void lfo_gui(LFO& lfo_1, const char* window_name) {
-    if (ImGui::Begin(window_name)) {
-        parameter_knob(lfo_1.wave, CC_LFO1_WAVE);
-        ImGui::SameLine();
-        parameter_knob(lfo_1.freq, CC_LFO1_FREQ);
-    }
-
-    ImGui::End(); // Begin
-}
-
-void patch_gui(Patch& patch_1, const char* window_name) {
-    if (ImGui::Begin(window_name)) {
-        parameter_knob(patch_1.intensty, CC_PATCH1_INTENSTY);
-    }
-
-    ImGui::End(); // Begin
+void patch_gui(Timbre& timbre, const char* window_name) {
+    // TODO: Patches window / cool UI
 }
 
 void equalizer_gui(Equalizer& eq, const char* window_name) {
@@ -308,16 +324,8 @@ void equalizer_gui(Equalizer& eq, const char* window_name) {
     ImGui::End(); // Begin
 }
 
-void effect_gui(Effect& effect_1, const char* window_name) {
-    if (ImGui::Begin(window_name)) {
-        parameter_knob(effect_1.dry_wet, CC_MST_FX1_DRY_WET);
-        ImGui::SameLine();
-        parameter_knob(effect_1.ctrl_1, CC_MST_FX1_CTRL_1);
-        ImGui::SameLine();
-        parameter_knob(effect_1.ctrl_2, CC_MST_FX1_CTRL_2);
-    }
-
-    ImGui::End(); // Begin
+void effect_gui(Program& program, const char* window_name) {
+    // TODO: Effects window
 }
 
 void timbre_gui(Timbre& timbre) {
@@ -326,14 +334,20 @@ void timbre_gui(Timbre& timbre) {
 
     oscillator_gui(timbre.osc_1, "Oscillator 1");
     unison_gui(timbre.unison, "Unison");
+
     mixer_gui(timbre.mixer, "Mixer");
-    amp_gui(timbre.amp, "Amp");
-    drive_gui(timbre.drive_ws, "Drive/Ws");
-    eg_gui(timbre.eg_1, "Envelope generator");
-    lfo_gui(timbre.lfo_1, "Low Frequency Oscillator");
-    patch_gui(timbre.patch_1, "Patch 1");
     equalizer_gui(timbre.eq, "Equalizer");
-    effect_gui(timbre.mst_fx_1, "Effect 1");
+    amp_gui(timbre.amp, "Amp");
+
+    eg_gui(timbre.eg_arr[0], "Envelope generator 1", 0);
+    eg_gui(timbre.eg_arr[1], "Envelope generator 2", 1);
+    eg_gui(timbre.eg_arr[2], "Envelope generator 3", 2);
+
+    lfo_gui(timbre.lfo_arr[0], "Low Frequency Oscillator 1", 0);
+    lfo_gui(timbre.lfo_arr[1], "Low Frequency Oscillator 2", 1);
+
+    patch_gui(timbre, "Patches");
+
 }
 
 void program_gui(Program& program) {
@@ -344,6 +358,8 @@ void program_gui(Program& program) {
             }
         }
     }
+
+    effect_gui(program, "Effects");
 
     ImGui::End(); // Begin
 }
