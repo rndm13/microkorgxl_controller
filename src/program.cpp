@@ -11,7 +11,7 @@ static void filter_data_deserialize(Timbre* out_timbre, const SerializedFilterDa
     assert(out_timbre != nullptr);
     assert(filter_data != nullptr);
 
-    out_timbre->filter_arr[0].type_bal = static_cast<FilterTypeBalance>(filter_data->filter1_bal);
+    out_timbre->filter_arr[0].type_bal = static_cast<Filter1TypeBalance>(filter_data->filter1_bal);
     out_timbre->filter_arr[1].type_bal = static_cast<Filter2TypeBalance>(filter_data->filter2_type);
 
     for (size_t i = 0; i < ARRAY_SIZE(out_timbre->filter_arr); i++) {

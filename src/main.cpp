@@ -17,10 +17,32 @@
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
 
+#define MAX_ENUM_ELEMS 16
+
+struct EnumElem {
+    int value;
+    const char* name;
+};
+struct EnumArr {
+    EnumElem arr[MAX_ENUM_ELEMS];
+    size_t size;
+};
+
+#define ENUM_ELEM_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
+#define ENUM_ARR(ENUM)                                               \
+{                                                                    \
+  .arr = {                                                           \
+      ENUM(ENUM_ELEM_VARIANT)                                        \
+  },                                                                 \
+  .size = (0 ENUM(PLUS_ONE_VARIANT)),                                \
+}                                                                    \
+
 struct App {
     Program program;
     Timbre* selected_timbre;
     MidiInterface* midi;
+
+    ImFont* regular_font;
 };
 
 App g_app = {};
@@ -71,46 +93,29 @@ static ParamEx timbre_ex(ParamEx param) {
     return param;
 }
 
-// TODO: change value parameter to be a pointer (to match parameter_enum)
-void parameter_knob(int& value, ControlChange cc, const char* name = NULL) {
-    if (name == NULL) {
-        name = control_change_name(cc);
-    }
-
-    if (ImGuiKnobs::KnobInt(name, &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
-        g_app.midi->send_control_change(cc, value);
-    }
-}
-
+// TODO: Replace reference with pointer
 void parameter_knob(int& value, ParamEx param, const char* name) {
     if (ImGuiKnobs::KnobInt(name, &value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
         g_app.midi->send_control_change_ex(param, value);
     }
 }
 
-struct EnumElem {
-    int value;
-    const char* name;
-};
-
-#define ENUM_ARR_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
-
-void parameter_enum(int* value, ParamEx param, const char* name, const EnumElem* enum_arr, size_t enum_arr_size) {
+void parameter_enum(int* value, ParamEx param, const char* name, const EnumArr* enum_arr) {
     size_t value_idx = 0;
 
-    for (ssize_t i = enum_arr_size - 1; i > 0; i--) {
-        if (*value >= enum_arr[i].value) {
-            *value = enum_arr[i].value;
+    for (ssize_t i = enum_arr->size - 1; i > 0; i--) {
+        if (*value >= enum_arr->arr[i].value) {
+            *value = enum_arr->arr[i].value;
             value_idx = i;
             break;
         }
     }
 
-    if (ImGui::BeginCombo(name, enum_arr[value_idx].name)) {
-        for (size_t i = 0; i < enum_arr_size; i++) {
+    if (ImGui::BeginCombo(name, enum_arr->arr[value_idx].name)) {
+        for (size_t i = 0; i < enum_arr->size; i++) {
             bool is_selected = value_idx == i;
-            if (ImGui::Selectable(enum_arr[i].name, is_selected)) {
-                *value = enum_arr[i].value;
+            if (ImGui::Selectable(enum_arr->arr[i].name, is_selected)) {
+                *value = enum_arr->arr[i].value;
                 g_app.midi->send_control_change_ex(param, *value);
             }
             if (is_selected) {
@@ -125,7 +130,7 @@ void filter_graph_gui(Filter& filter, size_t filter_idx) {
     float y[128] = {0};
     float cutoff = filter.cutoff;
     float resonance = filter.resonance;
-    FilterTypeBalance type_bal = static_cast<FilterTypeBalance>(filter.type_bal);
+    Filter1TypeBalance type_bal = static_cast<Filter1TypeBalance>(filter.type_bal);
     if (filter_idx >= 1) {
         switch (filter.type_bal) {
             case FTB2_12LPF:
@@ -177,7 +182,7 @@ void filter_graph_gui(Filter& filter, size_t filter_idx) {
     ImGui::PlotLines("##FILTER_PLOT", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
 }
 
-void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
+void filter_gui(Filter& filter, const char* window_name, size_t idx) {
     static const ParamEx params[][2] = {
         {{0, 0x31}, {0, 0x40}}, // Balance
         {{0, 0x32}, {0, 0x42}}, // Cutoff
@@ -186,57 +191,76 @@ void filter_gui(Filter& filter, const char* window_name, size_t filter_idx) {
         {{0, 0x35}, {0, 0x45}}, // Keyboard track
         {{0, 0x36}, {0, 0x46}}, // Velocity sensitivity
     };
-    static const EnumElem filter1_enum_elems[] = {
-        FILTER_TYPE_BAL_ENUM(ENUM_ARR_VARIANT)
+    static const EnumArr type_bal_enum[] = {
+        ENUM_ARR(FILTER1_TYPE_BAL_ENUM),
+        ENUM_ARR(FILTER2_TYPE_BAL_ENUM)
     };
-    static const EnumElem filter2_enum_elems[] = {
-        FILTER2_TYPE_BAL_ENUM(ENUM_ARR_VARIANT)
-    };
-
-    size_t enum_size = ARRAY_SIZE(filter1_enum_elems);
-    const EnumElem* enum_elems = filter1_enum_elems;
-    if (filter_idx == 1) {
-        enum_elems = filter2_enum_elems;
-        enum_size = ARRAY_SIZE(filter2_enum_elems);
-    }
 
     if (ImGui::Begin(window_name)) {
-        filter_graph_gui(filter, filter_idx);
+        filter_graph_gui(filter, idx);
 
-        parameter_enum(&filter.type_bal, timbre_ex(params[0][filter_idx]), "Balance Type###type_bal", enum_elems, enum_size);
-        parameter_knob(filter.cutoff, timbre_ex(params[1][filter_idx]), "Cutoff###cutoff");
+        parameter_enum(&filter.type_bal, timbre_ex(params[0][idx]), "Balance Type###type_bal", &type_bal_enum[idx]);
+        parameter_knob(filter.cutoff, timbre_ex(params[1][idx]), "Cutoff###cutoff");
         ImGui::SameLine();
-        parameter_knob(filter.resonance, timbre_ex(params[2][filter_idx]), "Resonance###resonance");
+        parameter_knob(filter.resonance, timbre_ex(params[2][idx]), "Resonance###resonance");
         ImGui::SameLine();
-        parameter_knob(filter.eg1_int, timbre_ex(params[3][filter_idx]), "EG1 Intensity###eg1_int");
+        parameter_knob(filter.eg1_int, timbre_ex(params[3][idx]), "EG1 Intensity###eg1_int");
         ImGui::SameLine();
-        parameter_knob(filter.key_trk, timbre_ex(params[4][filter_idx]), "Key tracking###key_trk");
+        parameter_knob(filter.key_trk, timbre_ex(params[4][idx]), "Key tracking###key_trk");
         ImGui::SameLine();
-        parameter_knob(filter.vel_sens, timbre_ex(params[5][filter_idx]), "Velocity sensitivity###vel_sens");
+        parameter_knob(filter.vel_sens, timbre_ex(params[5][idx]), "Velocity sensitivity###vel_sens");
     }
 
     ImGui::End(); // Begin
 }
 
-void oscillator_gui(Oscillator& osc, const char* window_name) {
-    // TODO: osc2 and wave select via a graph
+void oscillator_gui(Oscillator& osc, const char* window_name, size_t idx) {
+    static const ParamEx params[][2] = {
+        {{0, 0x17}, {0, 0x20}}, // Wave Type
+        {{0, 0x18}, {0, 0x21}}, // Mod
+        {{0, 0x19}, {0, 0x22}}, // CTRL 1 / Semitone
+        {{0, 0x1A}, {0, 0x23}}, // CTRL 2 / Tune
+        {{0, 0x1B}, {0, 0xFF}}, // PCM DWGS
+    };
+    static const EnumArr wave_enum[] = {
+        ENUM_ARR(OSC1_WAVE_TYPE_ENUM),
+        ENUM_ARR(OSC2_WAVE_TYPE_ENUM)
+    };
+    static const EnumArr mod_enum[] = {
+        ENUM_ARR(OSC1_OSC_MOD_ENUM),
+        ENUM_ARR(OSC2_OSC_MOD_ENUM)
+    };
+
+    // TODO: wave select via a graph
 
     if (ImGui::Begin(window_name)) {
-        parameter_knob(osc.wave, CC_OSC1_WAVE);
-        ImGui::SameLine();
-        parameter_knob(osc.osc_mod, CC_OSC1_OSC_MOD);
-        ImGui::SameLine();
-        parameter_knob(osc.control_arr[0], CC_OSC1_C1);
-        ImGui::SameLine();
-        parameter_knob(osc.control_arr[1], CC_OSC1_C2);
+        parameter_enum(&osc.wave, timbre_ex(params[0][idx]), "Wave", &wave_enum[idx]);
+        parameter_enum(&osc.osc_mod, timbre_ex(params[1][idx]), "Modulation", &mod_enum[idx]);
+        if (idx == 0) {
+            parameter_knob(osc.control_arr[0], timbre_ex(params[2][idx]), "Control 1");
+            ImGui::SameLine();
+            parameter_knob(osc.control_arr[1], timbre_ex(params[3][idx]), "Control 2");
+            ImGui::SameLine();
+            parameter_knob(osc.pcm_dwgs_wave, timbre_ex(params[4][idx]), "PCM/DWGS");
+        } else {
+            parameter_knob(osc.semitone, timbre_ex(params[2][idx]), "Semitone");
+            ImGui::SameLine();
+            parameter_knob(osc.tune, timbre_ex(params[3][idx]), "Tune");
+        }
     }
 
     ImGui::End(); // Begin
 }
 
 void unison_gui(Unison& unison, const char* window_name) {
+    static const EnumArr uv_enum = ENUM_ARR(UNISON_VOICE_ENUM);
+    static const EnumArr va_enum = ENUM_ARR(VOICE_ASSIGN_ENUM);
+
     if (ImGui::Begin(window_name)) {
-        parameter_knob(unison.mode, CC_UNISON_MODE);
+        parameter_enum(&unison.mode, timbre_ex({0, 0x08}), "Unison Voice", &uv_enum);
+        parameter_enum(&unison.voice_assign, timbre_ex({0, 0x0A}), "Spread", &va_enum);
+        parameter_knob(unison.detune, timbre_ex({0, 0x09}), "Detune");
+        parameter_knob(unison.spread, timbre_ex({0, 0x0A}), "Spread");
     }
 
     ImGui::End(); // Begin
@@ -244,7 +268,6 @@ void unison_gui(Unison& unison, const char* window_name) {
 
 void mixer_gui(Mixer& mix, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        // TODO: Vertical slider, also add osc2
         parameter_knob(mix.osc_lvl[0], timbre_ex({0, 0x28}), "OSC1###osc1");
         ImGui::SameLine();
         parameter_knob(mix.osc_lvl[1], timbre_ex({0, 0x29}), "OSC2###osc2");
@@ -320,9 +343,12 @@ void patch_gui(Timbre& timbre, const char* window_name) {
 
 void equalizer_gui(Equalizer& eq, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(eq.lo_gain, CC_EQ_LO_GAIN);
+        parameter_knob(eq.lo_freq, timbre_ex({0x09, 0x00}), "Low Frequency");
         ImGui::SameLine();
-        parameter_knob(eq.hi_gain, CC_EQ_HI_GAIN);
+        parameter_knob(eq.lo_gain, timbre_ex({0x09, 0x01}), "Low Gain");
+        parameter_knob(eq.hi_freq, timbre_ex({0x09, 0x02}), "High Frequency");
+        ImGui::SameLine();
+        parameter_knob(eq.hi_gain, timbre_ex({0x09, 0x03}), "High Gain");
     }
 
     ImGui::End(); // Begin
@@ -336,8 +362,8 @@ void timbre_gui(Timbre& timbre) {
     filter_gui(timbre.filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(timbre.filter_arr[1], "Filter 2###filter2", 1);
 
-    oscillator_gui(timbre.osc_arr[0], "Oscillator 1");
-    // oscillator_gui(timbre.osc_arr[1], "Oscillator 2");
+    oscillator_gui(timbre.osc_arr[0], "Oscillator 1", 0);
+    oscillator_gui(timbre.osc_arr[1], "Oscillator 2", 1);
     unison_gui(timbre.unison, "Unison");
 
     mixer_gui(timbre.mixer, "Mixer");
@@ -379,8 +405,12 @@ void program_gui(Program& program) {
 }
 
 void app_gui() {
+    ImGui::PushFont(g_app.regular_font);
+
     program_gui(g_app.program);
     timbre_gui(*g_app.selected_timbre);
+
+    ImGui::PopFont();
 
     if (ImGui::Begin("Logs")) {
         HelloImGui::LogGui();
@@ -472,6 +502,10 @@ void app_pre_frame() {
     }
 }
 
+void load_fonts() {
+    g_app.regular_font = HelloImGui::LoadFont("fonts/DroidSans.ttf", 12);
+}
+
 int main(int, char *[]) {
     bool ok = app_init(g_app);
     if (!ok) {
@@ -483,12 +517,15 @@ int main(int, char *[]) {
     HelloImGui::SetAssetsFolder(ASSETS_LOCATION);
 #endif
 
-    HelloImGui::RunnerParams runnerParams;
+    HelloImGui::RunnerParams runnerParams = {};
     runnerParams.imGuiWindowParams.showMenuBar = true;
     runnerParams.imGuiWindowParams.showStatus_Fps = true;
+
     runnerParams.callbacks.ShowGui = app_gui;
     runnerParams.callbacks.PreNewFrame = app_pre_frame;
     runnerParams.callbacks.ShowMenus = app_menu_bar_gui;
+    runnerParams.callbacks.LoadAdditionalFonts = load_fonts;
+
     runnerParams.fpsIdling.enableIdling = false;
 
     runnerParams.appWindowParams.windowTitle = "MicroKORG XL Controller";
