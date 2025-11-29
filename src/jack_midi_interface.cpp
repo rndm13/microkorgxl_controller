@@ -6,6 +6,8 @@
 #define EX_HEADER                             0xF042307E
 #define EX_CHANNEL_MASK                       0x00000F00
 
+#define EX_PROGRAM_WRITE_REQUEST_CODE         0x11
+
 #define EX_PROGRAM_DUMP_REQUEST_CODE          0x1C
 #define EX_PROGRAM_DUMP_CODE                  0x4C
 
@@ -211,6 +213,28 @@ bool JACKMidi::send_cur_program_dump_req() {
 
     uint8_t code = EX_CUR_PROGRAM_DUMP_REQUEST_CODE;
     PUSH_BYTES(code);
+
+    uint8_t end = EX_END;
+    PUSH_BYTES(end);
+
+    this->push_event();
+
+    return true;
+}
+
+bool JACKMidi::send_program_write_req(Program* cur_program, uint8_t dst_program) {
+    dst_program = 0x7F & dst_program;
+
+    uint32_t header = htobe32(EX_HEADER);
+    PUSH_BYTES(header);
+
+    uint8_t code = EX_PROGRAM_WRITE_REQUEST_CODE;
+    PUSH_BYTES(code);
+
+    PUSH_BYTES(dst_program);
+
+    dst_program = 0;
+    PUSH_BYTES(dst_program);
 
     uint8_t end = EX_END;
     PUSH_BYTES(end);

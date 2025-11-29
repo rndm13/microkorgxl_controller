@@ -18,6 +18,7 @@ struct MidiInterface {
     virtual bool send_control_change(uint8_t param_id, uint8_t val) = 0;
     virtual bool send_control_change_ex(ParamEx param, uint16_t val) = 0;
     virtual bool send_cur_program_dump_req() = 0;
+    virtual bool send_program_write_req(Program* cur_program, uint8_t dst_program) = 0;
     virtual bool init() = 0;
     virtual void deinit() = 0;
 };

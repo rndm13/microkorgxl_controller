@@ -44,3 +44,9 @@ bool DummyMidi::send_cur_program_dump_req() {
 
     return true;;
 }
+
+bool DummyMidi::send_program_write_req(Program* cur_program, uint8_t dst_program) {
+    Log(LogLevel::Debug, "Program write request");
+
+    return true;;
+}

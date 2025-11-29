@@ -391,6 +391,13 @@ void app_menu_bar_gui() {
             }
         }
 
+        if (ImGui::MenuItem("Write request")) {
+            bool ok = g_app.midi->send_program_write_req(&g_app.program, 0);
+            if (!ok) {
+                Log(LogLevel::Error, "Failed to send program write request");
+            }
+        }
+
         ImGui::EndMenu();
     }
 }
