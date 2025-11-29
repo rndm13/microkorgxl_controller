@@ -1,6 +1,8 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #include "program.hpp"
 
@@ -19,3 +21,6 @@ struct MidiInterface {
     virtual bool init() = 0;
     virtual void deinit() = 0;
 };
+
+size_t convert_from_midi_data(uint8_t* buffer, ssize_t size);
+size_t convert_to_midi_data(uint8_t* buffer, ssize_t size);

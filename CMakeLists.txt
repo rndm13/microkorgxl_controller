@@ -54,6 +54,7 @@ endif()
 # portable installation is the easiest way to install the app
 imgui_bundle_add_app(microkorgxl_controller
     src/main.cpp
+    src/midi_interface.cpp
     src/dummy_midi_interface.cpp
     src/jack_midi_interface.cpp
     src/program.cpp

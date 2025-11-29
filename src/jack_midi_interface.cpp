@@ -89,32 +89,6 @@ static int process(jack_nframes_t nframes, void *arg) {
     return 0;
 }
 
-static size_t convert_to_midi_data(jack_midi_data_t* buffer, ssize_t size) {
-    // TODO:
-
-    return 0;
-}
-
-static size_t convert_from_midi_data(jack_midi_data_t* buffer, ssize_t size) {
-    size_t result_size = 0;
-    for (size_t i = 0; i < size; i += 8) {
-        uint8_t data_arr[8] = {0};
-        size_t data_size = std::min(sizeof(data_arr), size - i);
-        memcpy(data_arr, &buffer[i], data_size);
-
-        uint8_t bits_7 = data_arr[0];
-
-        for (size_t j = 0; j < data_size - 1; j++) {
-            data_arr[j] = data_arr[j + 1] | ((bits_7 >> j) << 7);
-        }
-
-        memcpy(&buffer[result_size], data_arr, data_size - 1);
-        result_size += data_size - 1;
-    }
-
-    return result_size;
-}
-
 const jack_midi_data_t* JACKMidi::handle_received_program(
         Program* cur_program,
         const jack_midi_data_t* buffer,
