@@ -14,6 +14,12 @@
 #define EX_CUR_PROGRAM_DUMP_REQUEST_CODE      0x10
 #define EX_CUR_PROGRAM_DUMP_CODE              0x40
 
+#define EX_STATUS_WRITE_COMPLETED             0x21
+#define EX_STATUS_WRITE_ERROR                 0x22
+#define EX_STATUS_DATA_LOAD_COMPLETED         0x23
+#define EX_STATUS_DATA_LOAD_ERROR             0x24
+#define EX_STATUS_DATA_FORMAT_ERROR           0x26
+
 #define EX_CC_CODE                            0x41
 
 #define EX_END                                0xF7
@@ -21,7 +27,7 @@
 #define PUSH_BYTES(X) this->push_bytes(reinterpret_cast<uint8_t*>(&(X)), sizeof(X));
 
 static uint16_t encode_u16(uint16_t val);
-static void debug_dump_bytes(uint8_t *bytes, size_t size);
+static void debug_dump_bytes(const uint8_t *bytes, size_t size);
 
 static int process(jack_nframes_t nframes, void *arg) {
     assert(arg != nullptr);
@@ -73,7 +79,7 @@ static int process(jack_nframes_t nframes, void *arg) {
 
     for (size_t i = 0; i < jack_midi->send_queue_size; i++) {
         int result = jack_midi_event_write(
-                out_buf, nframes,
+                out_buf, i,
                 jack_midi->send_queue[i].buffer,
                 jack_midi->send_queue[i].size);
         if (result != 0) {
@@ -98,15 +104,12 @@ const jack_midi_data_t* JACKMidi::handle_received_program(
     Log(LogLevel::Debug, "Handling received program");
     for (size_t i = 0; i < size; i++) {
         if (buffer[i] == EX_END) {
-            this->program_buffer_size = convert_from_midi_data(this->program_buffer, this->program_buffer_size);
+            Log(LogLevel::Debug, "SYNTH, program_buffer_size: %zu", this->program_buffer_size);
 
-            Log(LogLevel::Debug, "PROGRAM DUMP:");
-            debug_dump_bytes(this->program_buffer, this->program_buffer_size);
+            this->program_buffer_size = convert_from_midi_data(this->program_buffer, this->program_buffer_size);
 
             switch (this->state) {
                 case JMS_DOWNLOADING_CUR_PROGRAM_DATA:
-                    Log(LogLevel::Debug, "Program buffer size: %d", this->program_buffer_size);
-
                     if (this->program_buffer_size != PROGRAM_SERIALIZED_SIZE) {
                         Log(LogLevel::Error, "Wrong program size %d", this->program_buffer_size);
                         break;
@@ -125,6 +128,9 @@ const jack_midi_data_t* JACKMidi::handle_received_program(
             }
 
             this->state = JMS_RUNNING;
+            // memset(this->program_buffer, 0, this->program_buffer_size);
+            this->program_buffer_size = 0;
+
             return &buffer[i + 1];
         }
 
@@ -135,14 +141,34 @@ const jack_midi_data_t* JACKMidi::handle_received_program(
 }
 
 const jack_midi_data_t* JACKMidi::handle_received_event_ex(const jack_midi_data_t* buffer, ssize_t size) {
-    // Handle exclusive events
+    uint8_t code = 0;
+
     Log(LogLevel::Debug, "Handling exclusive events");
 
     if (size <= 0) {
         return NULL;
     }
 
-    switch (buffer[0]) {
+    code = buffer[0];
+    buffer += 1;
+    size -= 1;
+
+    switch (code) {
+        case EX_STATUS_WRITE_COMPLETED:
+            Log(LogLevel::Info, "SYNTH: Write completed");
+            break;
+        case EX_STATUS_DATA_LOAD_COMPLETED:
+            Log(LogLevel::Info, "SYNTH: Data load completed");
+            break;
+        case EX_STATUS_WRITE_ERROR:
+            Log(LogLevel::Error, "SYNTH: Write error");
+            break;
+        case EX_STATUS_DATA_LOAD_ERROR:
+            Log(LogLevel::Error, "SYNTH: Data load error");
+            break;
+        case EX_STATUS_DATA_FORMAT_ERROR:
+            Log(LogLevel::Error, "SYNTH: Data format error");
+            break;
         case EX_CUR_PROGRAM_DUMP_CODE:
             memset(this->program_buffer, 0, this->program_buffer_size);
             this->program_buffer_size = 0;
@@ -152,8 +178,21 @@ const jack_midi_data_t* JACKMidi::handle_received_event_ex(const jack_midi_data_
             break;
     }
 
-    buffer += 1;
-    size -= 1;
+    // Eat additional EOX byte
+    switch (code) {
+        case EX_STATUS_WRITE_COMPLETED:
+        case EX_STATUS_DATA_LOAD_COMPLETED:
+        case EX_STATUS_WRITE_ERROR:
+        case EX_STATUS_DATA_LOAD_ERROR:
+        case EX_STATUS_DATA_FORMAT_ERROR:
+            buffer += 1;
+            size -= 1;
+            break;
+        case EX_CUR_PROGRAM_DUMP_CODE:
+            break;
+        case EX_PROGRAM_DUMP_CODE:
+            break;
+    }
 
     return buffer;
 }
@@ -193,10 +232,15 @@ bool JACKMidi::handle_received_data(Program* cur_program) {
         return true;
     }
 
+    // TODO: refactor this to instead use events from JACK
     const jack_midi_data_t* cur_event = this->recv_buffer;
     ssize_t cur_size = this->recv_buffer_size;
     while (cur_event != NULL) {
-        assert(cur_event < this->recv_buffer + this->recv_buffer_size);
+        assert(cur_event <= this->recv_buffer + this->recv_buffer_size);
+        if (cur_event == this->recv_buffer + this->recv_buffer_size) {
+            // Reached the end
+            break;
+        }
 
         cur_size = this->recv_buffer_size - (cur_event - this->recv_buffer);
         cur_event = handle_received_event(cur_program, cur_event, cur_size);
@@ -222,7 +266,36 @@ bool JACKMidi::send_cur_program_dump_req() {
     return true;
 }
 
-bool JACKMidi::send_program_write_req(Program* cur_program, uint8_t dst_program) {
+bool JACKMidi::send_cur_program_dump(const Program* cur_program) {
+    memset(this->program_buffer, 0, sizeof(this->program_buffer));
+
+    program_serialize(cur_program, this->program_buffer);
+    this->program_buffer_size = PROGRAM_SERIALIZED_SIZE;
+
+    this->program_buffer_size = convert_to_midi_data(this->program_buffer, this->program_buffer_size);
+
+    if (this->program_buffer_size != PROGRAM_MIDI_SERIALIZED_SIZE) {
+        Log(LogLevel::Error, "Wrong program midi buffer size: %d", this->program_buffer_size);
+        return false;
+    }
+
+    uint32_t header = htobe32(EX_HEADER);
+    uint8_t code = EX_CUR_PROGRAM_DUMP_CODE;
+    uint8_t end = EX_END;
+
+    PUSH_BYTES(header);
+    PUSH_BYTES(code);
+
+    this->push_bytes(this->program_buffer, PROGRAM_DUMP_SEND_SIZE);
+
+    PUSH_BYTES(end);
+
+    this->push_event();
+
+    return true;
+}
+
+bool JACKMidi::send_program_write_req(uint8_t dst_program) {
     dst_program = 0x7F & dst_program;
 
     uint32_t header = htobe32(EX_HEADER);
@@ -384,20 +457,25 @@ static uint16_t encode_u16(uint16_t val) {
     return result;
 }
 
-static void debug_dump_bytes(uint8_t *bytes, size_t size) {
+static void debug_dump_bytes(const uint8_t *bytes, size_t size) {
     char buffer[256] = {0};
     size_t buffer_len = 0;
 
     for (size_t i = 0; i < size; i++) {
         if (i % 16 == 0) {
             Log(LogLevel::Debug, buffer);
+            printf("%s\n", buffer);
+
             memset(buffer, 0, sizeof(buffer));
             buffer_len = 0;
         }
+
         buffer_len += snprintf(
                 buffer + buffer_len, sizeof(buffer),
-                "%hhx ", bytes[i]);
+                "%02hhx ", bytes[i]);
     }
-    Log(LogLevel::Debug, buffer);
 
+    Log(LogLevel::Debug, buffer);
+    printf("%s\n", buffer);
+    printf("\n\n\n");
 }

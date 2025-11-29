@@ -3,10 +3,12 @@
 
 #include "hello_imgui/hello_imgui.h"
 #include "imgui-knobs/imgui-knobs.h"
+#include "portable_file_dialogs/portable_file_dialogs.h"
 
 #include "stdint.h"
-#include <math.h>
+#include "math.h"
 #include "assert.h"
+#include "stdio.h"
 
 #include "program.hpp"
 #include "jack_midi_interface.hpp"
@@ -382,6 +384,40 @@ void app_gui() {
 #endif
 }
 
+void dialog_cur_program_save() {
+    pfd::save_file save_file("Current program data", "", {"All files", "*", "MicroKORG XL Program", "*.mkxl_prog"}, pfd::opt::none);
+
+    std::string result = save_file.result();
+    if (result.size() <= 0) {
+        return;
+    }
+
+    int rc = program_save(&g_app.program, result.c_str());
+    if (rc < 0) {
+        Log(LogLevel::Error, "Failed to save program to file: %s", strerror(errno));
+        return;
+    }
+
+    Log(LogLevel::Info, "Successfully saved program file");
+}
+
+void dialog_program_open() {
+    pfd::open_file open_file("Program data", "", {"All files", "*", "MicroKORG XL Program", "*.mkxl_prog"}, pfd::opt::none);
+
+    std::vector<std::string> result = open_file.result();
+    if (result.empty()) {
+        return;
+    }
+
+    int rc = program_open(&g_app.program, result[0].c_str());
+    if (rc < 0) {
+        Log(LogLevel::Error, "Failed to open program file: %s", strerror(errno));
+        return;
+    }
+
+    Log(LogLevel::Info, "Successfully opened program file");
+}
+
 void app_menu_bar_gui() {
     if (ImGui::BeginMenu("MIDI")) {
         if (ImGui::MenuItem("Request Current Program Dump")) {
@@ -391,11 +427,29 @@ void app_menu_bar_gui() {
             }
         }
 
+        if (ImGui::MenuItem("Send Current Program Dump")) {
+            bool ok = g_app.midi->send_cur_program_dump(&g_app.program);
+            if (!ok) {
+                Log(LogLevel::Error, "Failed to send current program dump");
+            }
+        }
+
         if (ImGui::MenuItem("Write request")) {
-            bool ok = g_app.midi->send_program_write_req(&g_app.program, 0);
+            bool ok = g_app.midi->send_program_write_req(0);
             if (!ok) {
                 Log(LogLevel::Error, "Failed to send program write request");
             }
+        }
+
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("Save current program")) {
+            dialog_cur_program_save();
+        }
+
+        if (ImGui::MenuItem("Open program")) {
+            dialog_program_open();
         }
 
         ImGui::EndMenu();

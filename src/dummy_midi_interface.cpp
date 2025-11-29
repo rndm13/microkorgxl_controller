@@ -42,11 +42,17 @@ void DummyMidi::deinit() {
 bool DummyMidi::send_cur_program_dump_req() {
     Log(LogLevel::Debug, "Current program dump request");
 
-    return true;;
+    return true;
 }
 
-bool DummyMidi::send_program_write_req(Program* cur_program, uint8_t dst_program) {
+bool DummyMidi::send_program_write_req(uint8_t dst_program) {
     Log(LogLevel::Debug, "Program write request");
 
-    return true;;
+    return true;
+}
+
+bool DummyMidi::send_cur_program_dump(const Program* cur_program) {
+    Log(LogLevel::Debug, "Current program dump");
+
+    return true;
 }

@@ -44,6 +44,7 @@ size_t convert_to_midi_data(uint8_t* buffer, ssize_t size) {
 
         for (size_t j = 0; j < data_size; j++) {
             bits_7 |= (data_arr[j] >> 7) << j;
+            data_arr[j] &= 0x7F;
         }
 
         buffer[result_size++] = bits_7;

@@ -3,9 +3,20 @@
 #include <stdint.h>
 
 #define PROGRAM_SERIALIZED_SIZE      346
+#define PROGRAM_MIDI_SERIALIZED_SIZE 396
+#define PROGRAM_DUMP_SEND_SIZE       399
+
 #define PROGRAM_NAME_LENGTH          8
 
 #define TIMBRE_NUM                   2
+
+#define FILE_PROGRAM_STR_HEADER   "6140PrgD"
+#define FILE_PROGRAM_HEADER       "\x36\x31\x34\x30\x50\x72\x67\x44\x20\x00\xF0\x01\x00\x00\x01\x00\x02\x00\x00\x00\x01\x00\x00\x00\xF0\x01\x00\x00\xFF\xFF\xFF\xFF"
+#define FILE_PROGRAM_HEADER_SIZE  0x20
+#define FILE_PROGRAM_FOOTER_SIZE  0x16
+#define FILE_WEIRD_DATA_SIZE      0x10
+#define FILE_ZERO_PADDING_SIZE    0x49
+#define FILE_255_PADDING_SIZE     0x17
 
 struct Filter {
     int cutoff;
@@ -106,6 +117,7 @@ struct Timbre {
 struct Program {
     char name[PROGRAM_NAME_LENGTH + 1];
     Timbre timbre_arr[TIMBRE_NUM];
+    uint16_t tempo;
 };
 
 struct __attribute__((packed)) SerializedOsc1Data {
@@ -303,5 +315,18 @@ struct __attribute__((packed)) SerializedProgram {
     SerializedArppegio arp;
 };
 
+struct FileSerializedProgram {
+    uint8_t header[0x20];
+
+    SerializedProgram prog;
+
+    uint8_t footer[0x16];
+    uint8_t weird[0x10];
+    uint8_t pad_zero[0x49];
+    uint8_t pad_255[0x17];
+};
+
 void program_deserialize(Program* out_prog, const uint8_t* data);
 void program_serialize(const Program* prog, uint8_t* data);
+int program_save(const Program* prog, const char* filepath);
+int program_open(Program* prog, const char* filepath);
