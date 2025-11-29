@@ -357,10 +357,19 @@ void timbre_gui(Timbre& timbre) {
 
 void program_gui(Program& program) {
     if (ImGui::Begin("Program###program")) {
+        ImGui::SetNextItemWidth(80);
         if (ImGui::InputText("Name", program.name, ARRAY_SIZE(program.name), ImGuiInputTextFlags_EnterReturnsTrue)) {
             for (uint16_t i = 0; i < ARRAY_SIZE(program.name) - 1; i++) {
-                g_app.midi->send_control_change_ex({0, i}, program.name[i]);
+                g_app.midi->send_control_change_ex({0x0, i}, program.name[i]);
             }
+        }
+        ImGui::SameLine();
+
+        int16_t min = 20;
+        int16_t max = 300;
+        ImGui::SetNextItemWidth(160);
+        if (ImGui::SliderScalar("Tempo", ImGuiDataType_S16, &program.tempo, &min, &max, "%d")) {
+            g_app.midi->send_control_change_ex({0x60, 0}, program.tempo);
         }
     }
 

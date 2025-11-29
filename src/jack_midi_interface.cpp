@@ -337,20 +337,17 @@ bool JACKMidi::send_control_change_ex(ParamEx param, uint16_t val) {
     assert(val < 1 << 14);
 
     uint32_t header = htobe32(EX_HEADER);
-    PUSH_BYTES(header);
-
     uint8_t code = EX_CC_CODE;
-    PUSH_BYTES(code);
-
     param.param_id = encode_u16(param.param_id);
     param.param_subid = encode_u16(param.param_subid);
     val = encode_u16(val);
+    uint8_t end = EX_END;
 
+    PUSH_BYTES(header);
+    PUSH_BYTES(code);
     PUSH_BYTES(param.param_id);
     PUSH_BYTES(param.param_subid);
     PUSH_BYTES(val);
-
-    uint8_t end = EX_END;
     PUSH_BYTES(end);
 
     this->push_event();
