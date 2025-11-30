@@ -420,7 +420,7 @@ void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
     const int GRAB_RADIUS = 5;
     const int SENSITIVITY = 1;
 
-    const ImGuiStyle& Style = ImGui::GetStyle();
+    const ImGuiStyle& style = ImGui::GetStyle();
     const ImGuiIO& IO = ImGui::GetIO();
 
     const ImVec2 size = ImGui::GetContentRegionAvail();
@@ -495,8 +495,8 @@ void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
     ImGui::SetCursorScreenPos(orig_pos);
 
     // Drawing
-    const ImColor c_line = Style.Colors[ImGuiCol_PlotLines];
-    const ImColor c_point = Style.Colors[ImGuiCol_Text];
+    const ImColor c_line = style.Colors[ImGuiCol_PlotLines];
+    const ImColor c_point = style.Colors[ImGuiCol_Text];
     for (int i = 0; i < ARRAY_SIZE(points) - 1; i++) {
         ImVec2 p1 = { points[i+0].x, 1 - points[i+0].y };
         ImVec2 p2 = { points[i+1].x, 1 - points[i+1].y };
@@ -756,10 +756,13 @@ void program_gui(Program* program) {
 
 void app_gui() {
     ImGui::PushFont(g_app.regular_font);
+    ImGuiStyle& style = ImGui::GetStyle();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, 0);
 
     program_gui(&g_app.program);
     timbre_gui(g_app.selected_timbre);
 
+    ImGui::PopStyleColor();
     ImGui::PopFont();
 
     if (ImGui::Begin("Logs")) {
