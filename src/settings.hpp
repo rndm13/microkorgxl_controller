@@ -97,3 +97,37 @@ enum UnisonVoice {
 enum VoiceAssign {
     VOICE_ASSIGN_ENUM(ENUM_VARIANT)
 };
+
+
+#define LFO1_WAVE_ENUM(VARIANT)                                       \
+    VARIANT(LFO1_W_SAW, 0)                                            \
+    VARIANT(LFO1_W_SQUARE, 1)                                         \
+    VARIANT(LFO1_W_TRIANGLE, 2)                                       \
+    VARIANT(LFO1_W_S_AND_H, 3)                                        \
+    VARIANT(LFO1_W_RANDOM,  4)                                        \
+
+enum LFO1Wave {
+    LFO1_WAVE_ENUM(ENUM_VARIANT)
+};
+
+
+#define LFO2_WAVE_ENUM(VARIANT)                                       \
+    VARIANT(LFO2_W_SAW, 0)                                            \
+    VARIANT(LFO2_W_SQUAREP, 1)                                        \
+    VARIANT(LFO2_W_SINE,      2)                                      \
+    VARIANT(LFO2_W_S_AND_H, 3)                                        \
+    VARIANT(LFO2_W_RANDOM,  4)                                        \
+
+enum LFO2Wave {
+    LFO2_WAVE_ENUM(ENUM_VARIANT)
+};
+
+
+#define LFO_KEY_SYNC_ENUM(VARIANT)                                   \
+    VARIANT(LFO_KS_OFF, 0)                                           \
+    VARIANT(LFO_KS_TIMBRE, 1)                                        \
+    VARIANT(LFO_KS_VOICE,  2)                                        \
+
+enum LFOKeySync {
+    LFO_KEY_SYNC_ENUM(ENUM_VARIANT)
+};

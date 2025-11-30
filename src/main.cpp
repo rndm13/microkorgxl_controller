@@ -41,6 +41,7 @@ enum AppFlags {
     AF_NONE = 0,
     AF_TIMBRE_PARAMS = 1 << 0,
 };
+
 struct App {
     int flags;
 
@@ -109,12 +110,26 @@ static void pop_timbre_params() {
     g_app.flags &= ~AF_TIMBRE_PARAMS;
 }
 
-void parameter_knob(int* value, ParamEx param, const char* name) {
+void parameter_knob(int* value, ParamEx param, const char* name, int min = 0, int max = 127) {
     if (g_app.flags & AF_TIMBRE_PARAMS) {
         param = timbre_ex(param);
     }
 
-    if (ImGuiKnobs::KnobInt(name, value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
+    *value = std::clamp(*value, min, max);
+
+    if (ImGuiKnobs::KnobInt(name, value, min, max, 1, "%d", ImGuiKnobVariant_Tick)) {
+        g_app.midi->send_control_change_ex(param, *value);
+    }
+}
+
+void parameter_checkbox(int* value, ParamEx param, const char* name) {
+    if (g_app.flags & AF_TIMBRE_PARAMS) {
+        param = timbre_ex(param);
+    }
+
+    bool bval = *value;
+    if (ImGui::Checkbox(name, &bval)) {
+        *value = bval;
         g_app.midi->send_control_change_ex(param, *value);
     }
 }
@@ -150,10 +165,15 @@ void parameter_enum(int* value, ParamEx param, const char* name, const EnumArr* 
 }
 
 void filter_graph_gui(Filter* filter, size_t filter_idx) {
+    static const ImVec2 size = {-1, 80};
     float y[128] = {0};
     float cutoff = filter->cutoff;
     float resonance = filter->resonance;
     Filter1TypeBalance type_bal = static_cast<Filter1TypeBalance>(filter->type_bal);
+
+    const float res_div = type_bal == FTB_24LPF ? 48 : 64;
+    const float min_res = type_bal == FTB_24LPF ? 48 : 24;
+
     if (filter_idx >= 1) {
         switch (filter->type_bal) {
             case FTB2_12LPF:
@@ -170,18 +190,9 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
         }
     }
 
-    ImVec2 size = {-1, 80};
-
     if (type_bal == FTB_THRU) {
         ImGui::Button("Disabled", size);
         return;
-    }
-
-    float res_div = 64;
-    float min_res = 24;
-    if (type_bal == FTB_24LPF) {
-        min_res = 48;
-        res_div = 48;
     }
 
     for (size_t x = 0; x < ARRAY_SIZE(y); x++) {
@@ -202,7 +213,7 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
         }
     }
 
-    ImGui::PlotLines("##FILTER_PLOT", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
+    ImGui::PlotLines("###filter_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
 }
 
 void filter_gui(Filter* filter, const char* window_name, size_t idx) {
@@ -281,7 +292,9 @@ void unison_gui(Unison* unison, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_enum(&unison->mode, {0x01, 0x08}, "Unison Voice", &uv_enum);
         parameter_enum(&unison->voice_assign, {0x01, 0x0A}, "Spread", &va_enum);
-        parameter_knob(&unison->detune, {0x01, 0x09}, "Detune");
+
+        parameter_knob(&unison->detune, {0x01, 0x09}, "Detune", 0, 99);
+        ImGui::SameLine();
         parameter_knob(&unison->spread, {0x01, 0x0A}, "Spread");
     }
 
@@ -339,21 +352,132 @@ void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     ImGui::End(); // Begin
 }
 
+float lerp(float a, float b, float f) {
+    return a * (1.0 - f) + (b * f);
+}
+
+void lfo_graph_gui(LFO* lfo, size_t idx) {
+    static const ImVec2 size = {320, 80};
+    static const int rand_points[][2] = {
+        {0,   0   },
+        {10,  0   },
+        {11,  127 },
+        {25,  56  },
+        {40,  -127},
+        {67,  45  },
+        {75,  -65 },
+        {98,  127 },
+        {105, 90  },
+        {116, -10 },
+        {127, 0   },
+        {128, 0   }
+    };
+    static bool first_run = true;
+    static float rand[128] = {0};
+    static float saw[128] = {0};
+    float y[128] = {0};
+    static const int lfo2_wave_mod = 0x10;
+    int wave = idx == 0 ? lfo->wave : lfo->wave | lfo2_wave_mod;
+    int freq = lfo->freq;
+
+    if (first_run) {
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            saw[i] = -static_cast<float>(((i * 8) % 256) - 127);
+        }
+
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            int j = 0;
+            for (j = 0; j < ARRAY_SIZE(rand_points); j++) {
+                if (i < rand_points[j + 1][0]) {
+                    break;
+                }
+            }
+
+            float f = float(i - rand_points[j][0]) / float(rand_points[j + 1][0] - rand_points[j][0]);
+            rand[i] = lerp(rand_points[j][1], rand_points[j + 1][1], f);
+        }
+    }
+
+    switch (wave) {
+    case LFO1_W_SAW:
+    case lfo2_wave_mod | LFO2_W_SAW:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = saw[i];
+        }
+        break;
+    case LFO1_W_SQUARE:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = (saw[i] < 0 ? -1 : 1) * 127;
+        }
+        break;
+    case lfo2_wave_mod | LFO2_W_SQUAREP:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = (saw[i] <= 0 ? 0 : 1) * 127;
+        }
+        break;
+    case lfo2_wave_mod | LFO2_W_SINE:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = sin(i * 16.0f / 127.0f) * 127.0f;
+        }
+        break;
+    case LFO1_W_TRIANGLE:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = abs(saw[i]) * 2 - 127;
+        }
+        break;
+    case lfo2_wave_mod | LFO2_W_S_AND_H:
+    case LFO1_W_S_AND_H: {
+        float sample = 0;
+        const int sample_freq = 16;
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            if (i % sample_freq == 0) {
+                sample = rand[i];
+            }
+            y[i] = sample;
+        }
+        break;
+    }
+    case LFO1_W_RANDOM:
+    case lfo2_wave_mod | LFO2_W_RANDOM:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = rand[i];
+        }
+        break;
+    }
+
+    ImGui::PlotLines("###lfo_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
+}
+
 void lfo_gui(LFO* lfo, const char* window_name, size_t idx) {
     const uint16_t param_mod = idx * 0x10;
 
     const ParamEx params[] = {
         {0x01, static_cast<uint16_t>(0x90 + param_mod)}, // Wave type
         {0x01, static_cast<uint16_t>(0x92 + param_mod)}, // Frequency
-        {0x01, static_cast<uint16_t>(0x93 + param_mod)}, // BPS sync
+        {0x01, static_cast<uint16_t>(0x93 + param_mod)}, // BPM sync
         {0x01, static_cast<uint16_t>(0x94 + param_mod)}, // Key sync
         {0x01, static_cast<uint16_t>(0x96 + param_mod)}, // Note sync
     };
 
+    const EnumArr wave_enum[] = {
+        ENUM_ARR(LFO1_WAVE_ENUM),
+        ENUM_ARR(LFO2_WAVE_ENUM),
+    };
+    const EnumArr ks_enum = ENUM_ARR(LFO_KEY_SYNC_ENUM);
+
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&lfo->wave, params[0], "Wave###wave");
+        lfo_graph_gui(lfo, idx);
+        ImGui::SetNextItemWidth(240);
+        parameter_enum(&lfo->wave, params[0], "Wave###wave", &wave_enum[idx]);
+
+        ImGui::SetNextItemWidth(240);
+        parameter_enum(&lfo->key_sync, params[3], "Key Sync###key_sync", &ks_enum);
         ImGui::SameLine();
+        parameter_checkbox(&lfo->bpm_sync, params[2], "BPM Sync###bpm_sync");
+
         parameter_knob(&lfo->freq, params[1], "Frequency###freq");
+        ImGui::SameLine();
+        parameter_knob(&lfo->note_sync, params[4], "Note Sync###note_sync", 0, 16);
     }
 
     ImGui::End(); // Begin
@@ -365,12 +489,12 @@ void patch_gui(Timbre* timbre, const char* window_name) {
 
 void equalizer_gui(Equalizer* eq, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&eq->lo_freq, {0x09, 0x00}, "Low Frequency");
+        parameter_knob(&eq->lo_freq, {0x09, 0x00}, "Low Frequency###lo_freq", 0, 33);
         ImGui::SameLine();
-        parameter_knob(&eq->lo_gain, {0x09, 0x01}, "Low Gain");
-        parameter_knob(&eq->hi_freq, {0x09, 0x02}, "High Frequency");
+        parameter_knob(&eq->lo_gain, {0x09, 0x01}, "Low Gain###lo_gain", 0, 127); // ????
+        parameter_knob(&eq->hi_freq, {0x09, 0x02}, "High Frequency###hi_freq", 0, 25);
         ImGui::SameLine();
-        parameter_knob(&eq->hi_gain, {0x09, 0x03}, "High Gain");
+        parameter_knob(&eq->hi_gain, {0x09, 0x03}, "High Gain###hi_gain", 0, 127); // ????
     }
 
     ImGui::End(); // Begin
@@ -409,17 +533,17 @@ void timbre_gui(Timbre* timbre) {
 void program_gui(Program* program) {
     if (ImGui::Begin("Program###program")) {
         ImGui::SetNextItemWidth(80);
-        if (ImGui::InputText("Name", program->name, ARRAY_SIZE(program->name), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputText("Name###name", program->name, ARRAY_SIZE(program->name), ImGuiInputTextFlags_EnterReturnsTrue)) {
             for (uint16_t i = 0; i < ARRAY_SIZE(program->name) - 1; i++) {
                 g_app.midi->send_control_change_ex({0x0, i}, program->name[i]);
             }
         }
-        ImGui::SameLine();
 
         int16_t min = 20;
         int16_t max = 300;
+        ImGui::SameLine();
         ImGui::SetNextItemWidth(160);
-        if (ImGui::SliderScalar("Tempo", ImGuiDataType_S16, &program->tempo, &min, &max, "%d")) {
+        if (ImGui::SliderScalar("Tempo###tempo", ImGuiDataType_S16, &program->tempo, &min, &max, "%d")) {
             g_app.midi->send_control_change_ex({0x60, 0}, program->tempo);
         }
 
@@ -427,7 +551,7 @@ void program_gui(Program* program) {
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(160);
-        if (ImGui::Combo("Timbre", &g_app.selected_timbre_idx, items, ARRAY_SIZE(items))) {
+        if (ImGui::Combo("Timbre###timbre", &g_app.selected_timbre_idx, items, ARRAY_SIZE(items))) {
             g_app.selected_timbre = &g_app.program.timbre_arr[g_app.selected_timbre_idx];
         }
     }

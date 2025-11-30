@@ -78,7 +78,6 @@ struct LFO {
     int freq;
     int key_sync;
     int bpm_sync;
-
     int note_sync;
 };
 
