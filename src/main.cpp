@@ -37,9 +37,17 @@ struct EnumArr {
   .size = (0 ENUM(PLUS_ONE_VARIANT)),                                \
 }                                                                    \
 
+enum AppFlags {
+    AF_NONE = 0,
+    AF_TIMBRE_PARAMS = 1 << 0,
+};
 struct App {
+    int flags;
+
     Program program;
     Timbre* selected_timbre;
+    int selected_timbre_idx;
+
     MidiInterface* midi;
 
     ImFont* regular_font;
@@ -50,7 +58,7 @@ App g_app = {};
 bool app_init(App* out_app) {
     Log(LogLevel::Info, "Initializing app");
 
-    out_app->program = {};
+    *out_app = {};
     out_app->midi = new JACKMidi();
 
     if (out_app->midi == nullptr) {
@@ -65,7 +73,7 @@ bool app_init(App* out_app) {
         return false;
     }
 
-    out_app->selected_timbre = &out_app->program.timbre_arr[0];
+    out_app->selected_timbre = &out_app->program.timbre_arr[out_app->selected_timbre_idx];
 
     Log(LogLevel::Info, "Successfully initialized app");
 
@@ -81,26 +89,41 @@ void app_deinit(App* app) {
 }
 
 static ParamEx timbre_ex(ParamEx param) {
-    param.param_id = 0xFF00 & param.param_id;
+    param.param_id = param.param_id;
 
     int16_t timbre_id = TIMBRE_1_ID;
     if (g_app.selected_timbre == &g_app.program.timbre_arr[1]) {
         timbre_id = TIMBRE_2_ID;
     }
 
-    param.param_id |= timbre_id;
+    param.param_id += timbre_id;
 
     return param;
 }
 
-// TODO: Replace reference with pointer
+static void push_timbre_params() {
+    g_app.flags |= AF_TIMBRE_PARAMS;
+}
+
+static void pop_timbre_params() {
+    g_app.flags &= ~AF_TIMBRE_PARAMS;
+}
+
 void parameter_knob(int* value, ParamEx param, const char* name) {
+    if (g_app.flags & AF_TIMBRE_PARAMS) {
+        param = timbre_ex(param);
+    }
+
     if (ImGuiKnobs::KnobInt(name, value, 0, 127, 1, "%d", ImGuiKnobVariant_Tick)) {
         g_app.midi->send_control_change_ex(param, *value);
     }
 }
 
 void parameter_enum(int* value, ParamEx param, const char* name, const EnumArr* enum_arr) {
+    if (g_app.flags & AF_TIMBRE_PARAMS) {
+        param = timbre_ex(param);
+    }
+
     size_t value_idx = 0;
 
     for (ssize_t i = enum_arr->size - 1; i > 0; i--) {
@@ -184,12 +207,12 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
 
 void filter_gui(Filter* filter, const char* window_name, size_t idx) {
     static const ParamEx params[][2] = {
-        {{0, 0x31}, {0, 0x40}}, // Balance
-        {{0, 0x32}, {0, 0x42}}, // Cutoff
-        {{0, 0x33}, {0, 0x43}}, // Resonance
-        {{0, 0x34}, {0, 0x44}}, // EG Intensity
-        {{0, 0x35}, {0, 0x45}}, // Keyboard track
-        {{0, 0x36}, {0, 0x46}}, // Velocity sensitivity
+        {{0x01, 0x31}, {0x01, 0x40}}, // Balance
+        {{0x01, 0x32}, {0x01, 0x42}}, // Cutoff
+        {{0x01, 0x33}, {0x01, 0x43}}, // Resonance
+        {{0x01, 0x34}, {0x01, 0x44}}, // EG Intensity
+        {{0x01, 0x35}, {0x01, 0x45}}, // Keyboard track
+        {{0x01, 0x36}, {0x01, 0x46}}, // Velocity sensitivity
     };
     static const EnumArr type_bal_enum[] = {
         ENUM_ARR(FILTER1_TYPE_BAL_ENUM),
@@ -199,16 +222,16 @@ void filter_gui(Filter* filter, const char* window_name, size_t idx) {
     if (ImGui::Begin(window_name)) {
         filter_graph_gui(filter, idx);
 
-        parameter_enum(&filter->type_bal, timbre_ex(params[0][idx]), "Balance Type###type_bal", &type_bal_enum[idx]);
-        parameter_knob(&filter->cutoff, timbre_ex(params[1][idx]), "Cutoff###cutoff");
+        parameter_enum(&filter->type_bal, params[0][idx], "Balance Type###type_bal", &type_bal_enum[idx]);
+        parameter_knob(&filter->cutoff, params[1][idx], "Cutoff###cutoff");
         ImGui::SameLine();
-        parameter_knob(&filter->resonance, timbre_ex(params[2][idx]), "Resonance###resonance");
+        parameter_knob(&filter->resonance, params[2][idx], "Resonance###resonance");
         ImGui::SameLine();
-        parameter_knob(&filter->eg1_int, timbre_ex(params[3][idx]), "EG1 Intensity###eg1_int");
+        parameter_knob(&filter->eg1_int, params[3][idx], "EG1 Intensity###eg1_int");
         ImGui::SameLine();
-        parameter_knob(&filter->key_trk, timbre_ex(params[4][idx]), "Key tracking###key_trk");
+        parameter_knob(&filter->key_trk, params[4][idx], "Key tracking###key_trk");
         ImGui::SameLine();
-        parameter_knob(&filter->vel_sens, timbre_ex(params[5][idx]), "Velocity sensitivity###vel_sens");
+        parameter_knob(&filter->vel_sens, params[5][idx], "Velocity sensitivity###vel_sens");
     }
 
     ImGui::End(); // Begin
@@ -216,11 +239,11 @@ void filter_gui(Filter* filter, const char* window_name, size_t idx) {
 
 void oscillator_gui(Oscillator* osc, const char* window_name, size_t idx) {
     static const ParamEx params[][2] = {
-        {{0, 0x17}, {0, 0x20}}, // Wave Type
-        {{0, 0x18}, {0, 0x21}}, // Mod
-        {{0, 0x19}, {0, 0x22}}, // CTRL 1 / Semitone
-        {{0, 0x1A}, {0, 0x23}}, // CTRL 2 / Tune
-        {{0, 0x1B}, {0, 0xFF}}, // PCM DWGS
+        {{0x01, 0x17}, {0x01, 0x20}}, // Wave Type
+        {{0x01, 0x18}, {0x01, 0x21}}, // Mod
+        {{0x01, 0x19}, {0x01, 0x22}}, // CTRL 1 / Semitone
+        {{0x01, 0x1A}, {0x01, 0x23}}, // CTRL 2 / Tune
+        {{0x01, 0x1B}, {0x01, 0xFF}}, // PCM DWGS
     };
     static const EnumArr wave_enum[] = {
         ENUM_ARR(OSC1_WAVE_TYPE_ENUM),
@@ -232,20 +255,19 @@ void oscillator_gui(Oscillator* osc, const char* window_name, size_t idx) {
     };
 
     // TODO: wave select via a graph
-
     if (ImGui::Begin(window_name)) {
-        parameter_enum(&osc->wave, timbre_ex(params[0][idx]), "Wave", &wave_enum[idx]);
-        parameter_enum(&osc->osc_mod, timbre_ex(params[1][idx]), "Modulation", &mod_enum[idx]);
+        parameter_enum(&osc->wave, params[0][idx], "Wave", &wave_enum[idx]);
+        parameter_enum(&osc->osc_mod, params[1][idx], "Modulation", &mod_enum[idx]);
         if (idx == 0) {
-            parameter_knob(&osc->control_arr[0], timbre_ex(params[2][idx]), "Control 1");
+            parameter_knob(&osc->control_arr[0], params[2][idx], "Control 1");
             ImGui::SameLine();
-            parameter_knob(&osc->control_arr[1], timbre_ex(params[3][idx]), "Control 2");
+            parameter_knob(&osc->control_arr[1], params[3][idx], "Control 2");
             ImGui::SameLine();
-            parameter_knob(&osc->pcm_dwgs_wave, timbre_ex(params[4][idx]), "PCM/DWGS");
+            parameter_knob(&osc->pcm_dwgs_wave, params[4][idx], "PCM/DWGS");
         } else {
-            parameter_knob(&osc->semitone, timbre_ex(params[2][idx]), "Semitone");
+            parameter_knob(&osc->semitone, params[2][idx], "Semitone");
             ImGui::SameLine();
-            parameter_knob(&osc->tune, timbre_ex(params[3][idx]), "Tune");
+            parameter_knob(&osc->tune, params[3][idx], "Tune");
         }
     }
 
@@ -257,10 +279,10 @@ void unison_gui(Unison* unison, const char* window_name) {
     static const EnumArr va_enum = ENUM_ARR(VOICE_ASSIGN_ENUM);
 
     if (ImGui::Begin(window_name)) {
-        parameter_enum(&unison->mode, timbre_ex({0, 0x08}), "Unison Voice", &uv_enum);
-        parameter_enum(&unison->voice_assign, timbre_ex({0, 0x0A}), "Spread", &va_enum);
-        parameter_knob(&unison->detune, timbre_ex({0, 0x09}), "Detune");
-        parameter_knob(&unison->spread, timbre_ex({0, 0x0A}), "Spread");
+        parameter_enum(&unison->mode, {0x01, 0x08}, "Unison Voice", &uv_enum);
+        parameter_enum(&unison->voice_assign, {0x01, 0x0A}, "Spread", &va_enum);
+        parameter_knob(&unison->detune, {0x01, 0x09}, "Detune");
+        parameter_knob(&unison->spread, {0x01, 0x0A}, "Spread");
     }
 
     ImGui::End(); // Begin
@@ -268,11 +290,11 @@ void unison_gui(Unison* unison, const char* window_name) {
 
 void mixer_gui(Mixer* mix, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&mix->osc_lvl[0], timbre_ex({0, 0x28}), "OSC1###osc1");
+        parameter_knob(&mix->osc_lvl[0], {0x01, 0x28}, "OSC1###osc1");
         ImGui::SameLine();
-        parameter_knob(&mix->osc_lvl[1], timbre_ex({0, 0x29}), "OSC2###osc2");
+        parameter_knob(&mix->osc_lvl[1], {0x01, 0x29}, "OSC2###osc2");
         ImGui::SameLine();
-        parameter_knob(&mix->noise_lvl, timbre_ex({0, 0x2A}), "NOISE###noise");
+        parameter_knob(&mix->noise_lvl, {0x01, 0x2A}, "NOISE###noise");
     }
 
     ImGui::End(); // Begin
@@ -281,11 +303,11 @@ void mixer_gui(Mixer* mix, const char* window_name) {
 void amp_gui(Amp* amp, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         // TODO: More amp params...
-        parameter_knob(&amp->lvl, timbre_ex({0, 0x50}), "Level###level");
+        parameter_knob(&amp->lvl, {0x01, 0x50}, "Level###level");
         ImGui::SameLine();
-        parameter_knob(&amp->depth, timbre_ex({0, 0x54}), "Depth###depth");
+        parameter_knob(&amp->depth, {0x01, 0x54}, "Depth###depth");
         ImGui::SameLine();
-        parameter_knob(&amp->panpot, timbre_ex({0, 0x55}), "Panpot###panpot");
+        parameter_knob(&amp->panpot, {0x01, 0x55}, "Panpot###panpot");
     }
 
     ImGui::End(); // Begin
@@ -295,23 +317,23 @@ void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     const uint16_t param_mod = idx * 0x10;
 
     const ParamEx params[] = {
-        {0, static_cast<uint16_t>(0x60 + param_mod)}, // Attack
-        {0, static_cast<uint16_t>(0x61 + param_mod)}, // Decay
-        {0, static_cast<uint16_t>(0x62 + param_mod)}, // Sustain
-        {0, static_cast<uint16_t>(0x63 + param_mod)}, // Release
-        {0, static_cast<uint16_t>(0x64 + param_mod)}, // Velocity sensitivity
+        {0x01, static_cast<uint16_t>(0x60 + param_mod)}, // Attack
+        {0x01, static_cast<uint16_t>(0x61 + param_mod)}, // Decay
+        {0x01, static_cast<uint16_t>(0x62 + param_mod)}, // Sustain
+        {0x01, static_cast<uint16_t>(0x63 + param_mod)}, // Release
+        {0x01, static_cast<uint16_t>(0x64 + param_mod)}, // Velocity sensitivity
     };
 
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&eg->attack, timbre_ex(params[0]), "Attack###attack");
+        parameter_knob(&eg->attack, params[0], "Attack###attack");
         ImGui::SameLine();
-        parameter_knob(&eg->decay, timbre_ex(params[1]), "Decay###decay");
+        parameter_knob(&eg->decay, params[1], "Decay###decay");
         ImGui::SameLine();
-        parameter_knob(&eg->sustain, timbre_ex(params[2]), "Sustain###sustain");
+        parameter_knob(&eg->sustain, params[2], "Sustain###sustain");
         ImGui::SameLine();
-        parameter_knob(&eg->release, timbre_ex(params[3]), "Release###release");
+        parameter_knob(&eg->release, params[3], "Release###release");
         ImGui::SameLine();
-        parameter_knob(&eg->vel_sens, timbre_ex(params[4]), "Velocity Sensitivity###vel_sens");
+        parameter_knob(&eg->vel_sens, params[4], "Velocity Sensitivity###vel_sens");
     }
 
     ImGui::End(); // Begin
@@ -321,17 +343,17 @@ void lfo_gui(LFO* lfo, const char* window_name, size_t idx) {
     const uint16_t param_mod = idx * 0x10;
 
     const ParamEx params[] = {
-        {0, static_cast<uint16_t>(0x90 + param_mod)}, // Wave type
-        {0, static_cast<uint16_t>(0x92 + param_mod)}, // Frequency
-        {0, static_cast<uint16_t>(0x93 + param_mod)}, // BPS sync
-        {0, static_cast<uint16_t>(0x94 + param_mod)}, // Key sync
-        {0, static_cast<uint16_t>(0x96 + param_mod)}, // Note sync
+        {0x01, static_cast<uint16_t>(0x90 + param_mod)}, // Wave type
+        {0x01, static_cast<uint16_t>(0x92 + param_mod)}, // Frequency
+        {0x01, static_cast<uint16_t>(0x93 + param_mod)}, // BPS sync
+        {0x01, static_cast<uint16_t>(0x94 + param_mod)}, // Key sync
+        {0x01, static_cast<uint16_t>(0x96 + param_mod)}, // Note sync
     };
 
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&lfo->wave, timbre_ex(params[0]), "Wave###wave");
+        parameter_knob(&lfo->wave, params[0], "Wave###wave");
         ImGui::SameLine();
-        parameter_knob(&lfo->freq, timbre_ex(params[1]), "Frequency###freq");
+        parameter_knob(&lfo->freq, params[1], "Frequency###freq");
     }
 
     ImGui::End(); // Begin
@@ -343,12 +365,12 @@ void patch_gui(Timbre* timbre, const char* window_name) {
 
 void equalizer_gui(Equalizer* eq, const char* window_name) {
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&eq->lo_freq, timbre_ex({0x09, 0x00}), "Low Frequency");
+        parameter_knob(&eq->lo_freq, {0x09, 0x00}, "Low Frequency");
         ImGui::SameLine();
-        parameter_knob(&eq->lo_gain, timbre_ex({0x09, 0x01}), "Low Gain");
-        parameter_knob(&eq->hi_freq, timbre_ex({0x09, 0x02}), "High Frequency");
+        parameter_knob(&eq->lo_gain, {0x09, 0x01}, "Low Gain");
+        parameter_knob(&eq->hi_freq, {0x09, 0x02}, "High Frequency");
         ImGui::SameLine();
-        parameter_knob(&eq->hi_gain, timbre_ex({0x09, 0x03}), "High Gain");
+        parameter_knob(&eq->hi_gain, {0x09, 0x03}, "High Gain");
     }
 
     ImGui::End(); // Begin
@@ -359,6 +381,8 @@ void effect_gui(Program* program, const char* window_name) {
 }
 
 void timbre_gui(Timbre* timbre) {
+    push_timbre_params();
+
     filter_gui(&timbre->filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(&timbre->filter_arr[1], "Filter 2###filter2", 1);
 
@@ -378,6 +402,8 @@ void timbre_gui(Timbre* timbre) {
     lfo_gui(&timbre->lfo_arr[1], "Low Frequency Oscillator 2", 1);
 
     patch_gui(timbre, "Patches");
+
+    pop_timbre_params();
 }
 
 void program_gui(Program* program) {
@@ -395,6 +421,14 @@ void program_gui(Program* program) {
         ImGui::SetNextItemWidth(160);
         if (ImGui::SliderScalar("Tempo", ImGuiDataType_S16, &program->tempo, &min, &max, "%d")) {
             g_app.midi->send_control_change_ex({0x60, 0}, program->tempo);
+        }
+
+        static const char* items[] = {"Timbre 1", "Timbre 2"};
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(160);
+        if (ImGui::Combo("Timbre", &g_app.selected_timbre_idx, items, ARRAY_SIZE(items))) {
+            g_app.selected_timbre = &g_app.program.timbre_arr[g_app.selected_timbre_idx];
         }
     }
 

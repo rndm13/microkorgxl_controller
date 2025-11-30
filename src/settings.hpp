@@ -2,8 +2,8 @@
 
 #define ARRAY_SIZE(X) (sizeof(X) / (sizeof(*(X))))
 
-#define TIMBRE_1_ID      0x11
-#define TIMBRE_2_ID      0x22
+#define TIMBRE_1_ID      0x10
+#define TIMBRE_2_ID      0x20
 
 #define ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 #define PLUS_ONE_VARIANT(...) + 1
