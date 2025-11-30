@@ -17,6 +17,8 @@
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
 
+#define GRAPH_SIZE ImVec2{320, 80}
+
 #define MAX_ENUM_ELEMS 16
 
 struct EnumElem {
@@ -164,8 +166,7 @@ void parameter_enum(int* value, ParamEx param, const char* name, const EnumArr* 
     }
 }
 
-void filter_graph_gui(Filter* filter, size_t filter_idx) {
-    static const ImVec2 size = {-1, 80};
+void filter_graph_gui(Filter* filter, size_t idx) {
     float y[128] = {0};
     float cutoff = filter->cutoff;
     float resonance = filter->resonance;
@@ -174,7 +175,7 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
     const float res_div = type_bal == FTB_24LPF ? 48 : 64;
     const float min_res = type_bal == FTB_24LPF ? 48 : 24;
 
-    if (filter_idx >= 1) {
+    if (idx >= 1) {
         switch (filter->type_bal) {
             case FTB2_12LPF:
                 type_bal = FTB_12LPF;
@@ -191,7 +192,7 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
     }
 
     if (type_bal == FTB_THRU) {
-        ImGui::Button("Disabled", size);
+        ImGui::Button("Disabled", GRAPH_SIZE);
         return;
     }
 
@@ -213,7 +214,7 @@ void filter_graph_gui(Filter* filter, size_t filter_idx) {
         }
     }
 
-    ImGui::PlotLines("###filter_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
+    ImGui::PlotLines("###filter_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, GRAPH_SIZE);
 }
 
 void filter_gui(Filter* filter, const char* window_name, size_t idx) {
@@ -248,6 +249,65 @@ void filter_gui(Filter* filter, const char* window_name, size_t idx) {
     ImGui::End(); // Begin
 }
 
+void oscillator_graph_gui(Oscillator* osc, size_t idx) {
+    const ImVec2 graph_size = {-1, GRAPH_SIZE.y};
+    float y[128] = {0};
+    const char* button_str = nullptr;
+    int wave = osc->wave;
+
+    static bool first_run = true;
+    static float saw[128] = {0};
+
+    if (first_run) {
+        first_run = false;
+
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            saw[i] = -static_cast<float>(((i * 8) % 256) - 127);
+        }
+    }
+
+    switch (wave) {
+    case OSC1_WT_SAW:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = saw[i];
+        }
+        break;
+    case OSC1_WT_PULSE:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = (saw[i] < 0 ? -1 : 1) * 127;
+        }
+        break;
+    case OSC1_WT_SIN:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = sin(i * 16.0f / 127.0f) * 127.0f;
+        }
+        break;
+    case OSC1_WT_TRIANGLE:
+        for (int i = 0; i < ARRAY_SIZE(y); i++) {
+            y[i] = abs(saw[i]) * 2 - 127;
+        }
+        break;
+    case OSC1_WT_FORMANT:
+        button_str = "FORMANT";
+        break;
+    case OSC1_WT_NOISE:
+        button_str = "NOISE";
+        break;
+    case OSC1_WT_PCM_DWGS:
+        button_str = "PCM/DWGS";
+        break;
+    case OSC1_WT_AUDIO_IN:
+        button_str = "AUDIO IN";
+        break;
+    }
+
+    if (button_str) {
+        ImGui::Button(button_str, graph_size);
+    } else {
+        ImGui::PlotLines("###filter_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, graph_size);
+    }
+}
+
 void oscillator_gui(Oscillator* osc, const char* window_name, size_t idx) {
     static const ParamEx params[][2] = {
         {{0x01, 0x17}, {0x01, 0x20}}, // Wave Type
@@ -267,18 +327,33 @@ void oscillator_gui(Oscillator* osc, const char* window_name, size_t idx) {
 
     // TODO: wave select via a graph
     if (ImGui::Begin(window_name)) {
-        parameter_enum(&osc->wave, params[0][idx], "Wave", &wave_enum[idx]);
-        parameter_enum(&osc->osc_mod, params[1][idx], "Modulation", &mod_enum[idx]);
-        if (idx == 0) {
-            parameter_knob(&osc->control_arr[0], params[2][idx], "Control 1");
-            ImGui::SameLine();
-            parameter_knob(&osc->control_arr[1], params[3][idx], "Control 2");
-            ImGui::SameLine();
-            parameter_knob(&osc->pcm_dwgs_wave, params[4][idx], "PCM/DWGS");
-        } else {
-            parameter_knob(&osc->semitone, params[2][idx], "Semitone");
-            ImGui::SameLine();
-            parameter_knob(&osc->tune, params[3][idx], "Tune");
+        oscillator_graph_gui(osc, idx);
+
+        const float child_wcoeff = 0.5f + (idx * -0.1);
+        const ImVec2 child_size = {ImGui::GetContentRegionAvail().x * child_wcoeff, 0};
+        {
+            ImGui::BeginChild("LeftSide###left", child_size);
+            if (idx == 0) {
+                parameter_knob(&osc->control_arr[0], params[2][idx], "Control 1");
+                ImGui::SameLine();
+                parameter_knob(&osc->control_arr[1], params[3][idx], "Control 2");
+                ImGui::SameLine();
+                parameter_knob(&osc->pcm_dwgs_wave, params[4][idx], "PCM/DWGS");
+            } else {
+                parameter_knob(&osc->semitone, params[2][idx], "Semitone");
+                ImGui::SameLine();
+                parameter_knob(&osc->tune, params[3][idx], "Tune");
+            }
+            ImGui::EndChild();
+        }
+
+        ImGui::SameLine();
+
+        {
+            ImGui::BeginChild("RightSide###right");
+            parameter_enum(&osc->wave, params[0][idx], "Wave", &wave_enum[idx]);
+            parameter_enum(&osc->osc_mod, params[1][idx], "Modulation", &mod_enum[idx]);
+            ImGui::EndChild();
         }
     }
 
@@ -357,7 +432,6 @@ float lerp(float a, float b, float f) {
 }
 
 void lfo_graph_gui(LFO* lfo, size_t idx) {
-    static const ImVec2 size = {320, 80};
     static const int rand_points[][2] = {
         {0,   0   },
         {10,  0   },
@@ -378,9 +452,10 @@ void lfo_graph_gui(LFO* lfo, size_t idx) {
     float y[128] = {0};
     static const int lfo2_wave_mod = 0x10;
     int wave = idx == 0 ? lfo->wave : lfo->wave | lfo2_wave_mod;
-    int freq = lfo->freq;
 
     if (first_run) {
+        first_run = false;
+
         for (int i = 0; i < ARRAY_SIZE(y); i++) {
             saw[i] = -static_cast<float>(((i * 8) % 256) - 127);
         }
@@ -445,7 +520,7 @@ void lfo_graph_gui(LFO* lfo, size_t idx) {
         break;
     }
 
-    ImGui::PlotLines("###lfo_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, size);
+    ImGui::PlotLines("###lfo_graph", y, ARRAY_SIZE(y), 0, NULL, -128, 128, GRAPH_SIZE);
 }
 
 void lfo_gui(LFO* lfo, const char* window_name, size_t idx) {
@@ -466,18 +541,28 @@ void lfo_gui(LFO* lfo, const char* window_name, size_t idx) {
     const EnumArr ks_enum = ENUM_ARR(LFO_KEY_SYNC_ENUM);
 
     if (ImGui::Begin(window_name)) {
-        lfo_graph_gui(lfo, idx);
-        ImGui::SetNextItemWidth(240);
-        parameter_enum(&lfo->wave, params[0], "Wave###wave", &wave_enum[idx]);
+        const ImVec2 size_l = {GRAPH_SIZE.x, 180};
 
-        ImGui::SetNextItemWidth(240);
-        parameter_enum(&lfo->key_sync, params[3], "Key Sync###key_sync", &ks_enum);
-        ImGui::SameLine();
-        parameter_checkbox(&lfo->bpm_sync, params[2], "BPM Sync###bpm_sync");
+        {
+            ImGui::BeginChild("LeftSide###left", size_l);
+            lfo_graph_gui(lfo, idx);
+            ImGui::SetNextItemWidth(240);
+            parameter_enum(&lfo->wave, params[0], "Wave###wave", &wave_enum[idx]);
 
-        parameter_knob(&lfo->freq, params[1], "Frequency###freq");
+            ImGui::SetNextItemWidth(240);
+            parameter_enum(&lfo->key_sync, params[3], "Key Sync###key_sync", &ks_enum);
+            parameter_checkbox(&lfo->bpm_sync, params[2], "BPM Sync###bpm_sync");
+            ImGui::EndChild();
+        }
+
         ImGui::SameLine();
-        parameter_knob(&lfo->note_sync, params[4], "Note Sync###note_sync", 0, 16);
+
+        {
+            ImGui::BeginChild("RightSide###right");
+            parameter_knob(&lfo->freq, params[1], "Frequency###freq");
+            parameter_knob(&lfo->note_sync, params[4], "Note Sync###note_sync", 0, 16);
+            ImGui::EndChild();
+        }
     }
 
     ImGui::End(); // Begin
