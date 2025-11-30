@@ -479,7 +479,7 @@ void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
                     break;
                 case 2:
                     param_ptr = &eg->sustain;
-                    change = dy;
+                    change = -dy;
                     break;
                 case 3:
                     param_ptr = &eg->release;
