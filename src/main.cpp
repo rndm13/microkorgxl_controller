@@ -21,25 +21,10 @@ using HelloImGui::LogLevel;
 #define GRAPH_SIZE ImVec2{320, 80}
 
 #define EG_PARAM_NUM 4
-#define MAX_ENUM_ELEMS 16
 
-struct EnumElem {
-    int value;
-    const char* name;
-};
-struct EnumArr {
-    EnumElem arr[MAX_ENUM_ELEMS];
-    size_t size;
-};
-
-#define ENUM_ELEM_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
-#define ENUM_ARR(ENUM)                                               \
-{                                                                    \
-  .arr = {                                                           \
-      ENUM(ENUM_ELEM_VARIANT)                                        \
-  },                                                                 \
-  .size = (0 ENUM(PLUS_ONE_VARIANT)),                                \
-}                                                                    \
+float lerp(float a, float b, float f) {
+    return a * (1.0 - f) + (b * f);
+}
 
 enum AppFlags {
     AF_NONE = 0,
@@ -533,10 +518,6 @@ void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     }
 
     ImGui::End(); // Begin
-}
-
-float lerp(float a, float b, float f) {
-    return a * (1.0 - f) + (b * f);
 }
 
 void lfo_graph_gui(LFO* lfo, size_t idx) {

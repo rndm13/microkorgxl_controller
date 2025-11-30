@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #define ARRAY_SIZE(X) (sizeof(X) / (sizeof(*(X))))
 
 #define TIMBRE_1_ID      0x10
@@ -131,3 +133,24 @@ enum LFO2Wave {
 enum LFOKeySync {
     LFO_KEY_SYNC_ENUM(ENUM_VARIANT)
 };
+
+#define MAX_ENUM_ELEMS 16
+
+struct EnumElem {
+    int value;
+    const char* name;
+};
+struct EnumArr {
+    EnumElem arr[MAX_ENUM_ELEMS];
+    size_t size;
+};
+
+#define ENUM_ELEM_VARIANT(NAME, VALUE) EnumElem{ NAME, #NAME },
+#define ENUM_ARR(ENUM)                                               \
+{                                                                    \
+  .arr = {                                                           \
+      ENUM(ENUM_ELEM_VARIANT)                                        \
+  },                                                                 \
+  .size = (0 ENUM(PLUS_ONE_VARIANT)),                                \
+}                                                                    \
+
