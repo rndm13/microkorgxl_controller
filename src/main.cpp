@@ -1,3 +1,4 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "immapp/immapp.h"
 #include "implot/implot.h"
 
@@ -19,6 +20,7 @@ using HelloImGui::LogLevel;
 
 #define GRAPH_SIZE ImVec2{320, 80}
 
+#define EG_PARAM_NUM 4
 #define MAX_ENUM_ELEMS 16
 
 struct EnumElem {
@@ -110,6 +112,18 @@ static void push_timbre_params() {
 
 static void pop_timbre_params() {
     g_app.flags &= ~AF_TIMBRE_PARAMS;
+}
+
+void parameter_slider(int* value, ParamEx param, const char* name, int min = 0, int max = 127) {
+    if (g_app.flags & AF_TIMBRE_PARAMS) {
+        param = timbre_ex(param);
+    }
+
+    *value = std::clamp(*value, min, max);
+
+    if (ImGui::SliderScalar(name, ImGuiDataType_S32, value, &min, &max, "%d")) {
+        g_app.midi->send_control_change_ex(param, *value);
+    }
 }
 
 void parameter_knob(int* value, ParamEx param, const char* name, int min = 0, int max = 127) {
@@ -401,6 +415,107 @@ void amp_gui(Amp* amp, const char* window_name) {
     ImGui::End(); // Begin
 }
 
+void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
+    const int LINE_WIDTH = 2;
+    const int GRAB_RADIUS = 5;
+    const int SENSITIVITY = 1;
+
+    const ImGuiStyle& Style = ImGui::GetStyle();
+    const ImGuiIO& IO = ImGui::GetIO();
+
+    const ImVec2 size = ImGui::GetContentRegionAvail();
+    ImVec2 bb[2] = {
+        ImGui::GetCursorScreenPos(),
+        ImGui::GetCursorScreenPos() + size,
+    };
+
+    float attack = eg->attack / 127.0f / 4;
+    float decay = eg->decay / 127.0f / 4;
+    const float post_decay = 1.0f / 4;
+    float sustain = eg->sustain / 127.0f;
+    float release = eg->release / 127.0f / 4;
+
+    ImVec2 points[6] = {
+        {0, 0},
+
+        {attack, 1},
+        {attack + decay, sustain},
+        {attack + decay + post_decay, sustain},
+        {attack + decay + post_decay + release, 0},
+
+        {1, 0},
+    };
+
+    // Grabbers
+    ImGui::BeginChild("###eg", size, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_NoScrollbar);
+
+    ImDrawList* DrawList = ImGui::GetWindowDrawList();
+
+    ImVec2 orig_pos = ImGui::GetCursorScreenPos();
+    for (int i = EG_PARAM_NUM - 1; i >= 0; i--) {
+        size_t point_i = i + 1;
+        ImGui::PushID(i);
+
+        ImVec2 pos = ImVec2{points[point_i].x, 1 - points[point_i].y} * (bb[1] - bb[0]) + bb[0];
+        ImGui::SetCursorScreenPos(pos - ImVec2(GRAB_RADIUS, GRAB_RADIUS));
+        ImGui::InvisibleButton("###grabber", ImVec2(2 * GRAB_RADIUS, 2 * GRAB_RADIUS));
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
+            int dx = IO.MouseDelta.x / SENSITIVITY;
+            int dy = IO.MouseDelta.y / SENSITIVITY;
+            ParamEx param_ex = params[i];
+            if (g_app.flags & AF_TIMBRE_PARAMS) {
+                param_ex = timbre_ex(param_ex);
+            }
+
+            int* param_ptr = NULL;
+            int change = dx;
+
+            switch (i) {
+                case 0:
+                    param_ptr = &eg->attack;
+                    break;
+                case 1:
+                    param_ptr = &eg->decay;
+                    break;
+                case 2:
+                    param_ptr = &eg->sustain;
+                    change = dy;
+                    break;
+                case 3:
+                    param_ptr = &eg->release;
+                    break;
+            }
+
+            *param_ptr = std::clamp(*param_ptr + change, 0, 127);
+            g_app.midi->send_control_change_ex(param_ex, *param_ptr);
+        }
+
+        ImGui::PopID();
+    }
+    ImGui::SetCursorScreenPos(orig_pos);
+
+    // Drawing
+    const ImColor c_line = Style.Colors[ImGuiCol_PlotLines];
+    const ImColor c_point = Style.Colors[ImGuiCol_Text];
+    for (int i = 0; i < ARRAY_SIZE(points) - 1; i++) {
+        ImVec2 p1 = { points[i+0].x, 1 - points[i+0].y };
+        ImVec2 p2 = { points[i+1].x, 1 - points[i+1].y };
+
+        ImVec2 s = {p1.x * (bb[1].x - bb[0].x) + bb[0].x, p1.y * (bb[1].y - bb[0].y) + bb[0].y};
+        ImVec2 e = {p2.x * (bb[1].x - bb[0].x) + bb[0].x, p2.y * (bb[1].y - bb[0].y) + bb[0].y};
+
+        DrawList->AddLine(s, e, c_line, LINE_WIDTH);
+    }
+
+    for (int i = 1; i < ARRAY_SIZE(points) - 1; i++) {
+        ImVec2 p1 = { points[i+0].x, 1 - points[i+0].y };
+        ImVec2 s = {p1.x * (bb[1].x - bb[0].x) + bb[0].x, p1.y * (bb[1].y - bb[0].y) + bb[0].y};
+        DrawList->AddCircleFilled(s, GRAB_RADIUS, c_point);
+    }
+
+    ImGui::EndChild();
+}
+
 void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     const uint16_t param_mod = idx * 0x10;
 
@@ -413,15 +528,8 @@ void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     };
 
     if (ImGui::Begin(window_name)) {
-        parameter_knob(&eg->attack, params[0], "Attack###attack");
-        ImGui::SameLine();
-        parameter_knob(&eg->decay, params[1], "Decay###decay");
-        ImGui::SameLine();
-        parameter_knob(&eg->sustain, params[2], "Sustain###sustain");
-        ImGui::SameLine();
-        parameter_knob(&eg->release, params[3], "Release###release");
-        ImGui::SameLine();
-        parameter_knob(&eg->vel_sens, params[4], "Velocity Sensitivity###vel_sens");
+        parameter_slider(&eg->vel_sens, params[4], "Velocity Sensitivity###vel_sens");
+        eg_graph_gui(eg, params);
     }
 
     ImGui::End(); // Begin
@@ -657,7 +765,6 @@ void app_gui() {
     if (ImGui::Begin("Logs")) {
         HelloImGui::LogGui();
     }
-
     ImGui::End(); // Begin
 
 #ifndef NDEBUG
