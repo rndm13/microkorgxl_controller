@@ -10,6 +10,8 @@
 #define ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 #define PLUS_ONE_VARIANT(...) + 1
 
+#define MAX_ENUM_ELEMS 16
+
 
 #define FILTER1_TYPE_BAL_ENUM(VARIANT)                               \
     VARIANT(FTB_24LPF, 0)                                            \
@@ -134,12 +136,69 @@ enum LFOKeySync {
     LFO_KEY_SYNC_ENUM(ENUM_VARIANT)
 };
 
-#define MAX_ENUM_ELEMS 16
+
+#define VOICE_MODE_ENUM(VARIANT)                                     \
+    VARIANT(VM_SINGLE, 0)                                            \
+    VARIANT(VM_LAYER,  1)                                            \
+    VARIANT(VM_SPLIT,  2)                                            \
+    VARIANT(VM_MULTI,  3)                                            \
+
+enum VoiceMode {
+    VOICE_MODE_ENUM(ENUM_VARIANT)
+};
+
+
+#define ARP_TIMBRE_SELECT_ENUM(VARIANT)                              \
+    VARIANT(ARP_TS_1,  0)                                            \
+    VARIANT(ARP_TS_2,  1)                                            \
+    VARIANT(ARP_TS_BOTH, 2)                                          \
+
+enum ARPTimbreSelect {
+    ARP_TIMBRE_SELECT_ENUM(ENUM_VARIANT)
+};
+
+
+#define SCALE_KEY_ENUM(VARIANT)                                      \
+    VARIANT(SK_C,       0)                                           \
+    VARIANT(SK_C_SHARP, 1)                                           \
+    VARIANT(SK_D,       2)                                           \
+    VARIANT(SK_D_SHARP, 3)                                           \
+    VARIANT(SK_E,       4)                                           \
+    VARIANT(SK_F,       5)                                           \
+    VARIANT(SK_F_SHARP, 6)                                           \
+    VARIANT(SK_G,       7)                                           \
+    VARIANT(SK_G_SHARP, 8)                                           \
+    VARIANT(SK_A,       9)                                           \
+    VARIANT(SK_A_SHARP, 10)                                          \
+    VARIANT(SK_B,       11)                                          \
+
+enum ScaleKey {
+    SCALE_KEY_ENUM(ENUM_VARIANT)
+};
+
+
+#define SCALE_TYPE_ENUM(VARIANT)                                     \
+    VARIANT(ST_EQUAL_TEMP, 0)                                        \
+    VARIANT(ST_PURE_MAJOR, 1)                                        \
+    VARIANT(ST_PURE_MINOR, 2)                                        \
+    VARIANT(ST_ARABIC,     3)                                        \
+    VARIANT(ST_PYTHAGOREA, 4)                                        \
+    VARIANT(ST_WERCKMEIST, 5)                                        \
+    VARIANT(ST_KIRNBERGER, 6)                                        \
+    VARIANT(ST_SLENDORO,   7)                                        \
+    VARIANT(ST_PELOG,      8)                                        \
+    VARIANT(ST_USER_SCALE, 9)                                        \
+
+enum ScaleType {
+    SCALE_TYPE_ENUM(ENUM_VARIANT)
+};
+
 
 struct EnumElem {
     int value;
     const char* name;
 };
+
 struct EnumArr {
     EnumElem arr[MAX_ENUM_ELEMS];
     size_t size;

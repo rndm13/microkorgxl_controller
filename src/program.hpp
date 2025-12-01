@@ -100,11 +100,20 @@ struct Effect {
     int ctrl_2;
 };
 
+struct PitchData {
+    int analog_tuning;
+    int transpose;
+    int detune;
+    int vibrato_int;
+    int bend_range;
+};
+
 struct Timbre {
     int filter_routing;
     Filter filter_arr[2];
     Oscillator osc_arr[2];
     Unison unison;
+    PitchData pitch;
     Mixer mixer;
     Amp amp;
     EnvelopeGenerator eg_arr[3];
@@ -116,6 +125,14 @@ struct Timbre {
 struct Program {
     char name[PROGRAM_NAME_LENGTH + 1];
     Timbre timbre_arr[TIMBRE_NUM];
+
+    int voice_mode;
+    int arp_timb_select;
+    int scale_key;
+    int scale_type;
+    int timbre2_midi_channel;
+    int octave_sw;
+
     uint16_t tempo;
 };
 

@@ -34,6 +34,18 @@ static void unison_data_deserialize(Timbre* out_timbre, const SerializedProgramD
     out_timbre->unison.voice_assign = prog_data->voice_assign;
 }
 
+static void pitch_data_deserialize(Timbre* out_timbre, const SerializedProgramData* prog_data) {
+    assert(out_timbre != nullptr);
+    assert(prog_data != nullptr);
+
+    // TODO: Add all of these to GUI
+    out_timbre->pitch.analog_tuning = prog_data->analog_tuning;
+    out_timbre->pitch.transpose = prog_data->transpose;
+    out_timbre->pitch.detune = prog_data->detune;
+    out_timbre->pitch.vibrato_int = prog_data->vibrato_int;
+    out_timbre->pitch.bend_range = prog_data->bend_range;
+}
+
 static void osc_data_deserialize(Timbre* out_timbre, const SerializedProgramData* prog_data) {
     assert(out_timbre != nullptr);
     assert(prog_data != nullptr);
@@ -131,6 +143,7 @@ static void timbre_deserialize(Timbre* out_timbre, const SerializedTimbre* timbr
     filter_data_deserialize(out_timbre, &timbre_data->data.filter);
     osc_data_deserialize(out_timbre, &timbre_data->data);
     unison_data_deserialize(out_timbre, &timbre_data->data);
+    pitch_data_deserialize(out_timbre, &timbre_data->data);
     mixer_data_deserialize(out_timbre, &timbre_data->data.mixer);
     amp_data_deserialize(out_timbre, &timbre_data->data.amp);
     eg_data_deserialize(out_timbre, &timbre_data->data);
@@ -149,6 +162,13 @@ void program_deserialize(Program* out_prog, const uint8_t* data) {
     for (size_t i = 0; i < ARRAY_SIZE(out_prog->timbre_arr); i++) {
         timbre_deserialize(&out_prog->timbre_arr[i], &prog->timbre_arr[i]);
     }
+
+    out_prog->voice_mode = prog->voice_mode;
+    out_prog->arp_timb_select = prog->arp_timb_select;
+    out_prog->scale_key = prog->scale_key;
+    out_prog->scale_type = prog->scale_type;
+    out_prog->timbre2_midi_channel = prog->timbre2_midi_channel;
+    out_prog->octave_sw = prog->octave_sw;
 
     out_prog->tempo = le16toh(prog->tempo);
 }
@@ -178,6 +198,18 @@ static void unison_data_serialize(const Timbre* in_timbre, SerializedProgramData
     prog_data->unison_detune = in_timbre->unison.detune;
     prog_data->unison_spread = in_timbre->unison.spread;
     prog_data->voice_assign = in_timbre->unison.voice_assign;
+}
+
+static void pitch_data_serialize(const Timbre* in_timbre, SerializedProgramData* prog_data) {
+    assert(in_timbre != nullptr);
+    assert(prog_data != nullptr);
+
+    // TODO: Add all of these to GUI
+    prog_data->analog_tuning = in_timbre->pitch.analog_tuning;
+    prog_data->transpose = in_timbre->pitch.transpose;
+    prog_data->detune = in_timbre->pitch.detune;
+    prog_data->vibrato_int = in_timbre->pitch.vibrato_int;
+    prog_data->bend_range = in_timbre->pitch.bend_range;
 }
 
 static void osc_data_serialize(const Timbre* in_timbre, SerializedProgramData* prog_data) {
@@ -277,6 +309,7 @@ static void timbre_serialize(const Timbre* in_timbre, SerializedTimbre* timbre_d
     filter_data_serialize(in_timbre, &timbre_data->data.filter);
     osc_data_serialize(in_timbre, &timbre_data->data);
     unison_data_serialize(in_timbre, &timbre_data->data);
+    pitch_data_serialize(in_timbre, &timbre_data->data);
     mixer_data_serialize(in_timbre, &timbre_data->data.mixer);
     amp_data_serialize(in_timbre, &timbre_data->data.amp);
     eg_data_serialize(in_timbre, &timbre_data->data);
@@ -295,6 +328,13 @@ void program_serialize(const Program* in_prog, uint8_t* data) {
     for (size_t i = 0; i < ARRAY_SIZE(in_prog->timbre_arr); i++) {
         timbre_serialize(&in_prog->timbre_arr[i], &prog->timbre_arr[i]);
     }
+
+    prog->voice_mode = in_prog->voice_mode;
+    prog->arp_timb_select = in_prog->arp_timb_select;
+    prog->scale_key = in_prog->scale_key;
+    prog->scale_type = in_prog->scale_type;
+    prog->timbre2_midi_channel = in_prog->timbre2_midi_channel;
+    prog->octave_sw = in_prog->octave_sw;
 
     prog->tempo = htole16(in_prog->tempo);
 }

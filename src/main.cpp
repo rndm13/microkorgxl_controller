@@ -18,6 +18,8 @@
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
 
+// TODO: Update all de/serialization with conversion of +/- parameters
+
 #define GRAPH_SIZE ImVec2{320, 80}
 
 #define EG_PARAM_NUM 4
@@ -119,6 +121,16 @@ void parameter_knob(int* value, ParamEx param, const char* name, int min = 0, in
     *value = std::clamp(*value, min, max);
 
     if (ImGuiKnobs::KnobInt(name, value, min, max, 1, "%d", ImGuiKnobVariant_Tick)) {
+        g_app.midi->send_control_change_ex(param, *value);
+    }
+}
+
+void parameter_input(int* value, ParamEx param, const char* name) {
+    if (g_app.flags & AF_TIMBRE_PARAMS) {
+        param = timbre_ex(param);
+    }
+
+    if (ImGui::InputScalar(name, ImGuiDataType_U16, value)) {
         g_app.midi->send_control_change_ex(param, *value);
     }
 }
@@ -238,11 +250,11 @@ void filter_gui(Filter* filter, const char* window_name, size_t idx) {
         ImGui::SameLine();
         parameter_knob(&filter->resonance, params[2][idx], "Resonance###resonance");
         ImGui::SameLine();
-        parameter_knob(&filter->eg1_int, params[3][idx], "EG1 Intensity###eg1_int");
+        parameter_knob(&filter->eg1_int, params[3][idx], "EG1 Intensity###eg1_int", -63, 63);
         ImGui::SameLine();
-        parameter_knob(&filter->key_trk, params[4][idx], "Key tracking###key_trk");
+        parameter_knob(&filter->key_trk, params[4][idx], "Key tracking###key_trk", -63, 63);
         ImGui::SameLine();
-        parameter_knob(&filter->vel_sens, params[5][idx], "Velocity sensitivity###vel_sens");
+        parameter_knob(&filter->vel_sens, params[5][idx], "Velocity sensitivity###vel_sens", -63, 63);
     }
 
     ImGui::End(); // Begin
@@ -339,9 +351,9 @@ void oscillator_gui(Oscillator* osc, const char* window_name, size_t idx) {
                 ImGui::SameLine();
                 parameter_knob(&osc->pcm_dwgs_wave, params[4][idx], "PCM/DWGS");
             } else {
-                parameter_knob(&osc->semitone, params[2][idx], "Semitone");
+                parameter_knob(&osc->semitone, params[2][idx], "Semitone", -24, 24);
                 ImGui::SameLine();
-                parameter_knob(&osc->tune, params[3][idx], "Tune");
+                parameter_knob(&osc->tune, params[3][idx], "Tune", -63, 63);
             }
             ImGui::EndChild();
         }
@@ -513,7 +525,7 @@ void eg_gui(EnvelopeGenerator* eg, const char* window_name, size_t idx) {
     };
 
     if (ImGui::Begin(window_name)) {
-        parameter_slider(&eg->vel_sens, params[4], "Velocity Sensitivity###vel_sens");
+        parameter_slider(&eg->vel_sens, params[4], "Velocity Sensitivity###vel_sens", -63, 63);
         eg_graph_gui(eg, params);
     }
 
@@ -665,10 +677,10 @@ void equalizer_gui(Equalizer* eq, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(&eq->lo_freq, {0x09, 0x00}, "Low Frequency###lo_freq", 0, 33);
         ImGui::SameLine();
-        parameter_knob(&eq->lo_gain, {0x09, 0x01}, "Low Gain###lo_gain", 0, 127); // ????
+        parameter_knob(&eq->lo_gain, {0x09, 0x01}, "Low Gain###lo_gain", -30, 30); // ????
         parameter_knob(&eq->hi_freq, {0x09, 0x02}, "High Frequency###hi_freq", 0, 25);
         ImGui::SameLine();
-        parameter_knob(&eq->hi_gain, {0x09, 0x03}, "High Gain###hi_gain", 0, 127); // ????
+        parameter_knob(&eq->hi_gain, {0x09, 0x03}, "High Gain###hi_gain", -30, 30); // ????
     }
 
     ImGui::End(); // Begin
@@ -676,6 +688,43 @@ void equalizer_gui(Equalizer* eq, const char* window_name) {
 
 void effect_gui(Program* program, const char* window_name) {
     // TODO: Effects window
+}
+
+void pitch_gui(PitchData* pitch, const char* window_name) {
+    bool open = true;
+    if (ImGui::BeginPopupModal(window_name, &open)) {
+        parameter_knob(&pitch->analog_tuning, {0x01, 0x13}, "Analog Tuning###analog_tuning");
+        ImGui::SameLine();
+        parameter_knob(&pitch->transpose, {0x01, 0x14}, "Transpose###transpose", -48, 48);
+        ImGui::SameLine();
+        parameter_knob(&pitch->detune, {0x01, 0x15}, "Detune###detune", -50, 50);
+
+        parameter_knob(&pitch->vibrato_int, {0x01, 0x16}, "Vibrato Intensity###vibrato_int", -63, 63);
+        ImGui::SameLine();
+        parameter_knob(&pitch->bend_range, {0x01, 0x17}, "Bend Range###bend_range", -12, 12);
+
+        ImGui::EndPopup();
+    }
+}
+
+void program_data_gui(Program* program, const char* window_name) {
+    bool open = true;
+    const EnumArr vm_enum = ENUM_ARR(VOICE_MODE_ENUM);
+    const EnumArr arp_timbre_enum = ENUM_ARR(ARP_TIMBRE_SELECT_ENUM);
+    const EnumArr sk_enum = ENUM_ARR(SCALE_KEY_ENUM);
+    const EnumArr st_enum = ENUM_ARR(SCALE_TYPE_ENUM);
+    if (ImGui::BeginPopupModal(window_name, &open)) {
+        parameter_enum(&program->voice_mode, {0, 0x19}, "Voice Mode###voice_mode", &vm_enum);
+        parameter_enum(&program->arp_timb_select, {0, 0x18}, "Arp Timbre###arp_timbre_select", &arp_timbre_enum);
+        parameter_enum(&program->scale_key, {0, 0x1E}, "Scale Key###scale_key", &sk_enum);
+        parameter_enum(&program->scale_type, {0, 0x17}, "Scale Type###scale_type", &st_enum);
+
+        parameter_knob(&program->timbre2_midi_channel, {0, 0x1A}, "Timbre 2 MIDI Channel###timbre2_midi_channel", 0, 15);
+        ImGui::SameLine();
+        parameter_knob(&program->octave_sw, {0, 0x1D}, "Octave###octave_sw", -3, 3);
+
+        ImGui::EndPopup();
+    }
 }
 
 void timbre_gui(Timbre* timbre) {
@@ -701,10 +750,14 @@ void timbre_gui(Timbre* timbre) {
 
     patch_gui(timbre, "Patches");
 
+    pitch_gui(&timbre->pitch, "Pitch Settings");
+
     pop_timbre_params();
 }
 
 void program_gui(Program* program) {
+    bool open_pitch = false;
+    bool open_program_data = false;
     if (ImGui::Begin("Program###program")) {
         ImGui::SetNextItemWidth(80);
         if (ImGui::InputText("Name###name", program->name, ARRAY_SIZE(program->name), ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -728,11 +781,27 @@ void program_gui(Program* program) {
         if (ImGui::Combo("Timbre###timbre", &g_app.selected_timbre_idx, items, ARRAY_SIZE(items))) {
             g_app.selected_timbre = &g_app.program.timbre_arr[g_app.selected_timbre_idx];
         }
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120);
+        open_pitch = ImGui::Button("Pitch Settings###pitch_button");
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120);
+        open_program_data = ImGui::Button("Program Settings###program_button");
+    }
+    ImGui::End(); // Begin
+
+    if (open_pitch) {
+        ImGui::OpenPopup("Pitch Settings");
     }
 
-    effect_gui(program, "Effects");
+    program_data_gui(&g_app.program, "Program Settings");
+    if (open_program_data) {
+        ImGui::OpenPopup("Program Settings");
+    }
 
-    ImGui::End(); // Begin
+    // effect_gui(program, "Effects");
 }
 
 void app_gui() {
