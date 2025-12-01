@@ -7,6 +7,18 @@
 #include <string.h>
 #include <errno.h>
 
+// Deserialization map
+static int16_t dmap(int16_t val, int16_t in_min, int16_t out_min) {
+    // We actually have all ranges with same size so we can just do this
+    return val - in_min + out_min;
+}
+
+// Serialization map
+static int16_t smap(int16_t val, int16_t out_min, int16_t in_min) {
+    // We actually have all ranges with same size so we can just do this
+    return val - in_min + out_min;
+}
+
 static void filter_data_deserialize(Timbre* out_timbre, const SerializedFilterData* filter_data) {
     assert(out_timbre != nullptr);
     assert(filter_data != nullptr);
@@ -17,9 +29,9 @@ static void filter_data_deserialize(Timbre* out_timbre, const SerializedFilterDa
     for (size_t i = 0; i < ARRAY_SIZE(out_timbre->filter_arr); i++) {
         out_timbre->filter_arr[i].cutoff = filter_data->filter_arr[i].cutoff;
         out_timbre->filter_arr[i].resonance = filter_data->filter_arr[i].resonance;
-        out_timbre->filter_arr[i].eg1_int = filter_data->filter_arr[i].eg1_int;
-        out_timbre->filter_arr[i].key_trk = filter_data->filter_arr[i].key_trk;
-        out_timbre->filter_arr[i].vel_sens = filter_data->filter_arr[i].vel_sens;
+        out_timbre->filter_arr[i].eg1_int = dmap(filter_data->filter_arr[i].eg1_int, 64 - 63, 0 - 63);
+        out_timbre->filter_arr[i].key_trk = dmap(filter_data->filter_arr[i].key_trk, 64 - 63, 0 - 63);
+        out_timbre->filter_arr[i].vel_sens = dmap(filter_data->filter_arr[i].vel_sens, 64 - 63, 0 - 63);
     }
 }
 
@@ -27,7 +39,6 @@ static void unison_data_deserialize(Timbre* out_timbre, const SerializedProgramD
     assert(out_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of these to GUI
     out_timbre->unison.mode = prog_data->unison_voice;
     out_timbre->unison.detune = prog_data->unison_detune;
     out_timbre->unison.spread = prog_data->unison_spread;
@@ -38,12 +49,11 @@ static void pitch_data_deserialize(Timbre* out_timbre, const SerializedProgramDa
     assert(out_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of these to GUI
     out_timbre->pitch.analog_tuning = prog_data->analog_tuning;
-    out_timbre->pitch.transpose = prog_data->transpose;
-    out_timbre->pitch.detune = prog_data->detune;
-    out_timbre->pitch.vibrato_int = prog_data->vibrato_int;
-    out_timbre->pitch.bend_range = prog_data->bend_range;
+    out_timbre->pitch.transpose = dmap(prog_data->transpose, 64 - 48, 0 - 48);
+    out_timbre->pitch.detune = dmap(prog_data->detune, 64 - 50, 0 - 50);
+    out_timbre->pitch.vibrato_int = dmap(prog_data->vibrato_int, 64 - 63, 0 - 63);
+    out_timbre->pitch.bend_range = dmap(prog_data->bend_range, 64 - 12, 0 - 12);
 }
 
 static void osc_data_deserialize(Timbre* out_timbre, const SerializedProgramData* prog_data) {
@@ -59,8 +69,8 @@ static void osc_data_deserialize(Timbre* out_timbre, const SerializedProgramData
 
     out_timbre->osc_arr[1].wave = prog_data->osc2.wave_type;
     out_timbre->osc_arr[1].osc_mod = prog_data->osc2.osc_mod;
-    out_timbre->osc_arr[1].semitone = prog_data->osc2.semitone;
-    out_timbre->osc_arr[1].tune = prog_data->osc2.tune;
+    out_timbre->osc_arr[1].semitone = dmap(prog_data->osc2.semitone, 64 - 24, 0 - 24);
+    out_timbre->osc_arr[1].tune = dmap(prog_data->osc2.tune, 64 - 63, 0 - 63);
 }
 
 static void mixer_data_deserialize(Timbre* out_timbre, const SerializedMixerData* mix_data) {
@@ -95,7 +105,7 @@ static void eg_data_deserialize(Timbre* out_timbre, const SerializedProgramData*
         out_timbre->eg_arr[i].decay = prog_data->eg_arr[i].decay;
         out_timbre->eg_arr[i].sustain = prog_data->eg_arr[i].sustain;
         out_timbre->eg_arr[i].release = prog_data->eg_arr[i].release;
-        out_timbre->eg_arr[i].vel_sens = prog_data->eg_arr[i].vel_sens;
+        out_timbre->eg_arr[i].vel_sens = dmap(prog_data->eg_arr[i].vel_sens, 64 - 63, 0 - 63);
     }
 }
 
@@ -103,7 +113,6 @@ static void lfo_data_deserialize(Timbre* out_timbre, const SerializedProgramData
     assert(out_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of this to GUI
     for (size_t i = 0; i < ARRAY_SIZE(prog_data->lfo_arr); i++) {
         out_timbre->lfo_arr[i].wave = prog_data->lfo_arr[i].wave_type;
         out_timbre->lfo_arr[i].freq = prog_data->lfo_arr[i].freq;
@@ -121,7 +130,7 @@ static void patch_data_deserialize(Timbre* out_timbre, const SerializedProgramDa
     for (size_t i = 0; i < ARRAY_SIZE(prog_data->patch_arr); i++) {
         out_timbre->patch_arr[i].src = prog_data->patch_arr[i].src;
         out_timbre->patch_arr[i].dst = prog_data->patch_arr[i].dst;
-        out_timbre->patch_arr[i].intensity = prog_data->patch_arr[i].intensity;
+        out_timbre->patch_arr[i].intensity = dmap(prog_data->patch_arr[i].intensity, 64 - 63, 0 - 63);
     }
 }
 
@@ -129,9 +138,8 @@ static void eq_data_deserialize(Timbre* out_timbre, const SerializedTimbre* timb
     assert(out_timbre != nullptr);
     assert(timbre_data != nullptr);
 
-    // TODO: Add all of this to GUI
-    out_timbre->eq.lo_gain = timbre_data->eq_lgain;
-    out_timbre->eq.hi_gain = timbre_data->eq_hgain;
+    out_timbre->eq.lo_gain = dmap(timbre_data->eq_lgain, 64 - 30, 0 - 30);
+    out_timbre->eq.hi_gain = dmap(timbre_data->eq_hgain, 64 - 30, 0 - 30);
     out_timbre->eq.lo_freq = timbre_data->eq_lfreq;
     out_timbre->eq.hi_freq = timbre_data->eq_hfreq;
 }
@@ -164,11 +172,12 @@ void program_deserialize(Program* out_prog, const uint8_t* data) {
     }
 
     out_prog->voice_mode = prog->voice_mode;
+    // TODO: Where is split key????????
     out_prog->arp_timb_select = prog->arp_timb_select;
     out_prog->scale_key = prog->scale_key;
     out_prog->scale_type = prog->scale_type;
     out_prog->timbre2_midi_channel = prog->timbre2_midi_channel;
-    out_prog->octave_sw = prog->octave_sw;
+    out_prog->octave_sw = dmap(prog->octave_sw, 8 - 3, 0 - 3);
 
     out_prog->tempo = le16toh(prog->tempo);
 }
@@ -183,9 +192,9 @@ static void filter_data_serialize(const Timbre* in_timbre, SerializedFilterData*
     for (size_t i = 0; i < ARRAY_SIZE(in_timbre->filter_arr); i++) {
         filter_data->filter_arr[i].cutoff = in_timbre->filter_arr[i].cutoff;
         filter_data->filter_arr[i].resonance = in_timbre->filter_arr[i].resonance;
-        filter_data->filter_arr[i].eg1_int = in_timbre->filter_arr[i].eg1_int;
-        filter_data->filter_arr[i].key_trk = in_timbre->filter_arr[i].key_trk;
-        filter_data->filter_arr[i].vel_sens = in_timbre->filter_arr[i].vel_sens;
+        filter_data->filter_arr[i].eg1_int = smap(in_timbre->filter_arr[i].eg1_int, 64 - 63, 0 - 63);
+        filter_data->filter_arr[i].key_trk = smap(in_timbre->filter_arr[i].key_trk, 64 - 63, 0 - 63);
+        filter_data->filter_arr[i].vel_sens = smap(in_timbre->filter_arr[i].vel_sens, 64 - 63, 0 - 63);
     }
 }
 
@@ -193,7 +202,6 @@ static void unison_data_serialize(const Timbre* in_timbre, SerializedProgramData
     assert(in_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of these to GUI
     prog_data->unison_voice = in_timbre->unison.mode;
     prog_data->unison_detune = in_timbre->unison.detune;
     prog_data->unison_spread = in_timbre->unison.spread;
@@ -204,12 +212,11 @@ static void pitch_data_serialize(const Timbre* in_timbre, SerializedProgramData*
     assert(in_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of these to GUI
     prog_data->analog_tuning = in_timbre->pitch.analog_tuning;
-    prog_data->transpose = in_timbre->pitch.transpose;
-    prog_data->detune = in_timbre->pitch.detune;
-    prog_data->vibrato_int = in_timbre->pitch.vibrato_int;
-    prog_data->bend_range = in_timbre->pitch.bend_range;
+    prog_data->transpose = smap(in_timbre->pitch.transpose, 64 - 48, 0 - 48);
+    prog_data->detune = smap(in_timbre->pitch.detune, 64 - 50, 0 - 50);
+    prog_data->vibrato_int = smap(in_timbre->pitch.vibrato_int, 64 - 63, 0 - 63);
+    prog_data->bend_range = smap(in_timbre->pitch.bend_range, 64 - 12, 0 - 12);
 }
 
 static void osc_data_serialize(const Timbre* in_timbre, SerializedProgramData* prog_data) {
@@ -225,8 +232,8 @@ static void osc_data_serialize(const Timbre* in_timbre, SerializedProgramData* p
 
     prog_data->osc2.wave_type = in_timbre->osc_arr[1].wave;
     prog_data->osc2.osc_mod = in_timbre->osc_arr[1].osc_mod;
-    prog_data->osc2.semitone = in_timbre->osc_arr[1].semitone;
-    prog_data->osc2.tune = in_timbre->osc_arr[1].tune;
+    prog_data->osc2.semitone = smap(in_timbre->osc_arr[1].semitone, 64 - 24, 0 - 24);
+    prog_data->osc2.tune = smap(in_timbre->osc_arr[1].tune, 64 - 63, 0 - 63);
 }
 
 static void mixer_data_serialize(const Timbre* in_timbre, SerializedMixerData* mix_data) {
@@ -261,7 +268,7 @@ static void eg_data_serialize(const Timbre* in_timbre, SerializedProgramData* pr
         prog_data->eg_arr[i].decay = in_timbre->eg_arr[i].decay;
         prog_data->eg_arr[i].sustain = in_timbre->eg_arr[i].sustain;
         prog_data->eg_arr[i].release = in_timbre->eg_arr[i].release;
-        prog_data->eg_arr[i].vel_sens = in_timbre->eg_arr[i].vel_sens;
+        prog_data->eg_arr[i].vel_sens = smap(in_timbre->eg_arr[i].vel_sens, 64 - 63, 0 - 63);
     }
 }
 
@@ -269,7 +276,6 @@ static void lfo_data_serialize(const Timbre* in_timbre, SerializedProgramData* p
     assert(in_timbre != nullptr);
     assert(prog_data != nullptr);
 
-    // TODO: Add all of this to GUI
     for (size_t i = 0; i < ARRAY_SIZE(prog_data->lfo_arr); i++) {
         prog_data->lfo_arr[i].wave_type = in_timbre->lfo_arr[i].wave;
         prog_data->lfo_arr[i].freq = in_timbre->lfo_arr[i].freq;
@@ -287,7 +293,7 @@ static void patch_data_serialize(const Timbre* in_timbre, SerializedProgramData*
     for (size_t i = 0; i < ARRAY_SIZE(prog_data->patch_arr); i++) {
         prog_data->patch_arr[i].src = in_timbre->patch_arr[i].src;
         prog_data->patch_arr[i].dst = in_timbre->patch_arr[i].dst;
-        prog_data->patch_arr[i].intensity = in_timbre->patch_arr[i].intensity;
+        prog_data->patch_arr[i].intensity = smap(in_timbre->patch_arr[i].intensity, 64 - 63, 0 - 63);
     }
 }
 
@@ -295,9 +301,8 @@ static void eq_data_serialize(const Timbre* in_timbre, SerializedTimbre* timbre_
     assert(in_timbre != nullptr);
     assert(timbre_data != nullptr);
 
-    // TODO: Add all of this to GUI
-    timbre_data->eq_lgain = in_timbre->eq.lo_gain;
-    timbre_data->eq_hgain = in_timbre->eq.hi_gain;
+    timbre_data->eq_lgain = smap(in_timbre->eq.lo_gain, 64 - 30, 0 - 30);
+    timbre_data->eq_hgain = smap(in_timbre->eq.hi_gain, 64 - 30, 0 - 30);
     timbre_data->eq_lfreq = in_timbre->eq.lo_freq;
     timbre_data->eq_hfreq = in_timbre->eq.hi_freq;
 }
@@ -334,7 +339,7 @@ void program_serialize(const Program* in_prog, uint8_t* data) {
     prog->scale_key = in_prog->scale_key;
     prog->scale_type = in_prog->scale_type;
     prog->timbre2_midi_channel = in_prog->timbre2_midi_channel;
-    prog->octave_sw = in_prog->octave_sw;
+    prog->octave_sw = smap(in_prog->octave_sw, 8 - 3, 0 - 3);
 
     prog->tempo = htole16(in_prog->tempo);
 }
