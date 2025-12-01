@@ -669,10 +669,6 @@ void lfo_gui(LFO* lfo, const char* window_name, size_t idx) {
     ImGui::End(); // Begin
 }
 
-void patch_gui(Timbre* timbre, const char* window_name) {
-    // TODO: Patches window / cool UI
-}
-
 void equalizer_gui(Equalizer* eq, const char* window_name) {
     if (ImGui::Begin(window_name)) {
         parameter_knob(&eq->lo_freq, {0x09, 0x00}, "Low Frequency###lo_freq", 0, 33);
@@ -727,6 +723,35 @@ void program_data_gui(Program* program, const char* window_name) {
     }
 }
 
+void patch_gui(Timbre* timbre, const char* window_name) {
+    bool open = true;
+    const EnumArr src_enum = ENUM_ARR(PATCH_SRC_ENUM);
+    const EnumArr dst_enum = ENUM_ARR(PATCH_DST_ENUM);
+    if (ImGui::BeginPopupModal(window_name, &open)) {
+        uint16_t id = 0x02;
+        uint16_t subid = 0x00;
+
+        for (size_t i = 0; i < ARRAY_SIZE(timbre->patch_arr); i++) {
+            ImGui::PushID(i);
+
+            ImGui::SetNextItemWidth(160);
+            parameter_enum(&timbre->patch_arr[i].src, {id, subid++}, "Source###src", &src_enum);
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160);
+            parameter_enum(&timbre->patch_arr[i].dst, {id, subid++}, "Destination###dst", &dst_enum);
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(240);
+            parameter_slider(&timbre->patch_arr[i].intensity, {id, subid++}, "Intensity###intensity", -63, 63);
+
+            ImGui::PopID();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
 void timbre_gui(Timbre* timbre) {
     push_timbre_params();
 
@@ -757,7 +782,9 @@ void timbre_gui(Timbre* timbre) {
 
 void program_gui(Program* program) {
     bool open_pitch = false;
+    bool open_patch = false;
     bool open_program_data = false;
+
     if (ImGui::Begin("Program###program")) {
         ImGui::SetNextItemWidth(80);
         if (ImGui::InputText("Name###name", program->name, ARRAY_SIZE(program->name), ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -788,6 +815,10 @@ void program_gui(Program* program) {
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120);
+        open_patch = ImGui::Button("Patches###patch_button");
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120);
         open_program_data = ImGui::Button("Program Settings###program_button");
     }
     ImGui::End(); // Begin
@@ -796,12 +827,14 @@ void program_gui(Program* program) {
         ImGui::OpenPopup("Pitch Settings");
     }
 
+    if (open_patch) {
+        ImGui::OpenPopup("Patches");
+    }
+
     program_data_gui(&g_app.program, "Program Settings");
     if (open_program_data) {
         ImGui::OpenPopup("Program Settings");
     }
-
-    // effect_gui(program, "Effects");
 }
 
 void app_gui() {

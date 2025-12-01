@@ -10,7 +10,7 @@
 #define ENUM_VARIANT(NAME, VALUE) NAME = VALUE,
 #define PLUS_ONE_VARIANT(...) + 1
 
-#define MAX_ENUM_ELEMS 16
+#define MAX_ENUM_ELEMS 40
 
 
 #define FILTER1_TYPE_BAL_ENUM(VARIANT)                               \
@@ -191,6 +191,72 @@ enum ScaleKey {
 
 enum ScaleType {
     SCALE_TYPE_ENUM(ENUM_VARIANT)
+};
+
+
+#define PATCH_SRC_ENUM(VARIANT)                                      \
+    VARIANT(PSRC_EG1,        0)                                      \
+    VARIANT(PSRC_EG2,        1)                                      \
+    VARIANT(PSRC_EG3,        2)                                      \
+    VARIANT(PSRC_LFO1,       3)                                      \
+    VARIANT(PSRC_LFO2,       4)                                      \
+    VARIANT(PSRC_VELOCITY,   5)                                      \
+    VARIANT(PSRC_PITCH_BEND, 6)                                      \
+    VARIANT(PSRC_MOD_WHEEL,  7)                                      \
+    VARIANT(PSRC_KEY_TRACK,  8)                                      \
+    VARIANT(PSRC_MIDI1,      9)                                      \
+    VARIANT(PSRC_MIDI2,      10)                                     \
+    VARIANT(PSRC_MIDI3,      11)                                     \
+
+enum PatchSource {
+    PATCH_SRC_ENUM(ENUM_VARIANT)
+};
+
+
+#define PATCH_DST_ENUM(VARIANT)                                      \
+    VARIANT(PDST_PITCH,                 0)                           \
+    VARIANT(PDST_OSC2_TUNE,             1)                           \
+    VARIANT(PDST_OSC1_CTRL1,            2)                           \
+    VARIANT(PDST_OSC1_LEVEL,            3)                           \
+    VARIANT(PDST_OSC2_LEVEL,            4)                           \
+    VARIANT(PDST_NOISE_LEVEL,           5)                           \
+    VARIANT(PDST_FILTER1_BALANCE,       6)                           \
+    VARIANT(PDST_FILTER1_CUTOFF,        7)                           \
+    VARIANT(PDST_FILTER1_RESONANCE,     8)                           \
+    VARIANT(PDST_FILTER2_CUTOFF,        9)                           \
+    VARIANT(PDST_DRIVE_WS_DEPTH,        10)                          \
+    VARIANT(PDST_AMP_LEVEL,             11)                          \
+    VARIANT(PDST_AMP_PANPOT,            12)                          \
+    VARIANT(PDST_LFO1_FREQ,             13)                          \
+    VARIANT(PDST_LFO2_FREQ,             14)                          \
+    VARIANT(PDST_PORTAMENTO,            15)                          \
+    VARIANT(PDST_OSC1_CTRL2,            16)                          \
+    VARIANT(PDST_FILTER1_EG1_INTENSITY, 17)                          \
+    VARIANT(PDST_FILTER1_KEY_TRACK,     18)                          \
+    VARIANT(PDST_FILTER2_RESONANCE,     19)                          \
+    VARIANT(PDST_FILTER2_EG1_INTENSITY, 20)                          \
+    VARIANT(PDST_FILTER2_KEY_TRACK,     21)                          \
+    VARIANT(PDST_EG1_ATTACK,            22)                          \
+    VARIANT(PDST_EG1_DECAY,             23)                          \
+    VARIANT(PDST_EG1_SUSTAIN,           24)                          \
+    VARIANT(PDST_EG1_RELEASE,           25)                          \
+    VARIANT(PDST_EG2_ATTACK,            26)                          \
+    VARIANT(PDST_EG2_DECAY,             27)                          \
+    VARIANT(PDST_EG2_SUSTAIN,           28)                          \
+    VARIANT(PDST_EG2_RELEASE,           29)                          \
+    VARIANT(PDST_EG3_ATTACK,            30)                          \
+    VARIANT(PDST_EG3_DECAY,             31)                          \
+    VARIANT(PDST_EG3_SUSTAIN,           32)                          \
+    VARIANT(PDST_EG3_RELEASE,           33)                          \
+    VARIANT(PDST_PATCH1_INTENSITY,      34)                          \
+    VARIANT(PDST_PATCH2_INTENSITY,      35)                          \
+    VARIANT(PDST_PATCH3_INTENSITY,      36)                          \
+    VARIANT(PDST_PATCH4_INTENSITY,      37)                          \
+    VARIANT(PDST_PATCH5_INTENSITY,      38)                          \
+    VARIANT(PDST_PATCH6_INTENSITY,      39)                          \
+
+enum PatchDestination {
+    PATCH_DST_ENUM(ENUM_VARIANT)
 };
 
 
