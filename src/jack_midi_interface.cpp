@@ -1,5 +1,7 @@
 #include "jack_midi_interface.hpp"
 
+#define CC_VALUE_SIGN_BIT_OFFSET              13
+
 #define CC_HEADER                             0xB0
 #define CC_CHANNEL_MASK                       0x0F
 
@@ -26,7 +28,7 @@
 
 #define PUSH_BYTES(X) this->push_bytes(reinterpret_cast<uint8_t*>(&(X)), sizeof(X));
 
-static uint16_t encode_u16(uint16_t val);
+static uint16_t encode_i16(uint16_t val);
 static void debug_dump_bytes(const uint8_t *bytes, size_t size);
 
 static int process(jack_nframes_t nframes, void *arg) {
@@ -331,16 +333,16 @@ bool JACKMidi::send_control_change(uint8_t param_id, uint8_t val) {
     return true;
 }
 
-bool JACKMidi::send_control_change_ex(ParamEx param, uint16_t val) {
+bool JACKMidi::send_control_change_ex(ParamEx param, int16_t val) {
     assert(param.param_id < 1 << 14);
     assert(param.param_subid < 1 << 14);
     assert(val < 1 << 14);
 
     uint32_t header = htobe32(EX_HEADER);
     uint8_t code = EX_CC_CODE;
-    param.param_id = encode_u16(param.param_id);
-    param.param_subid = encode_u16(param.param_subid);
-    val = encode_u16(val);
+    param.param_id = encode_i16(param.param_id);
+    param.param_subid = encode_i16(param.param_subid);
+    val = encode_i16(val);
     uint8_t end = EX_END;
 
     PUSH_BYTES(header);
@@ -444,8 +446,11 @@ void JACKMidi::push_bytes(const uint8_t *bytes, size_t size) {
     this->send_buffer_size += size;
 }
 
-static uint16_t encode_u16(uint16_t val) {
+static uint16_t encode_i16(uint16_t val) {
+    bool sign_bit = val < 0;
+    val |= sign_bit << CC_VALUE_SIGN_BIT_OFFSET;
     val = htole16(val);
+
     uint16_t result = 0;
 
     result |= 0x7F & val;

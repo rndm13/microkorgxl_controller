@@ -19,7 +19,7 @@ bool DummyMidi::send_control_change(uint8_t param_id, uint8_t val) {
     return true;
 }
 
-bool DummyMidi::send_control_change_ex(ParamEx param, uint16_t val) {
+bool DummyMidi::send_control_change_ex(ParamEx param, int16_t val) {
     assert(param.param_id < 1 << 14);
     assert(param.param_subid < 1 << 14);
     assert(val < 1 << 14);
