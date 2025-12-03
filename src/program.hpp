@@ -131,6 +131,7 @@ struct Program {
     int scale_key;
     int scale_type;
     int timbre2_midi_channel;
+    int voice_split_key;
     int octave_sw;
 
     uint16_t tempo;
@@ -311,7 +312,7 @@ struct __attribute__((packed)) SerializedProgram {
 
     uint8_t timbre2_midi_channel;
 
-    uint8_t _dummy2;
+    uint8_t voice_split_key;
 
     uint8_t _dummy3 : 4;
     uint8_t octave_sw : 4;

@@ -565,9 +565,20 @@ void program_data_gui(Program* program, const char* window_name) {
     const EnumArr sk_enum = ENUM_ARR(SCALE_KEY_ENUM);
     const EnumArr st_enum = ENUM_ARR(SCALE_TYPE_ENUM);
     if (ImGui::BeginPopupModal(window_name, &open)) {
+        ImGui::SetNextItemWidth(200);
         parameter_enum(&program->voice_mode, {0, 0x19}, "Voice Mode###voice_mode", &vm_enum);
+        if (program->voice_mode == VM_SPLIT) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(200);
+            // TODO: determine sys ex subid
+            parameter_input(&program->voice_split_key, {0xFF, 0xFF}, "Voice Split Key###voice_split_key", 0, 127);
+        }
+
+        ImGui::SetNextItemWidth(200);
         parameter_enum(&program->arp_timb_select, {0, 0x18}, "Arp Timbre###arp_timbre_select", &arp_timbre_enum);
+        ImGui::SetNextItemWidth(200);
         parameter_enum(&program->scale_key, {0, 0x1E}, "Scale Key###scale_key", &sk_enum);
+        ImGui::SetNextItemWidth(200);
         parameter_enum(&program->scale_type, {0, 0x17}, "Scale Type###scale_type", &st_enum);
 
         parameter_knob(&program->timbre2_midi_channel, {0, 0x1A}, "Timbre 2 MIDI Channel###timbre2_midi_channel", 0, 15);
@@ -841,9 +852,12 @@ int main(int, char *[]) {
     runner_params.callbacks.PreNewFrame = app_pre_frame;
     runner_params.callbacks.ShowMenus = app_menu_bar_gui;
     runner_params.callbacks.LoadAdditionalFonts = load_fonts;
+
+#ifndef NDEBUG
     runner_params.callbacks.RegisterTests = register_tests;
 
     runner_params.useImGuiTestEngine = true;
+#endif
 
     runner_params.dockingParams = layout();
 

@@ -31,12 +31,13 @@ void parameter_knob(int* value, ParamEx param, const char* name, int min, int ma
     }
 }
 
-void parameter_input(int* value, ParamEx param, const char* name) {
+void parameter_input(int* value, ParamEx param, const char* name, int min, int max) {
     if (g_app()->flags & AF_TIMBRE_PARAMS) {
         param = app_timbre_ex(param);
     }
 
     if (ImGui::InputScalar(name, ImGuiDataType_U16, value)) {
+        *value = std::clamp(*value, min, max);
         g_app()->midi->send_control_change_ex(param, *value);
     }
 }

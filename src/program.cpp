@@ -172,11 +172,11 @@ void program_deserialize(Program* out_prog, const uint8_t* data) {
     }
 
     out_prog->voice_mode = prog->voice_mode;
-    // TODO: Where is split key????????
     out_prog->arp_timb_select = prog->arp_timb_select;
     out_prog->scale_key = prog->scale_key;
     out_prog->scale_type = prog->scale_type;
     out_prog->timbre2_midi_channel = prog->timbre2_midi_channel;
+    out_prog->voice_split_key = prog->voice_split_key;
     out_prog->octave_sw = dmap(prog->octave_sw, 8 - 3, 0 - 3);
 
     out_prog->tempo = le16toh(prog->tempo);
@@ -339,6 +339,7 @@ void program_serialize(const Program* in_prog, uint8_t* data) {
     prog->scale_key = in_prog->scale_key;
     prog->scale_type = in_prog->scale_type;
     prog->timbre2_midi_channel = in_prog->timbre2_midi_channel;
+    prog->voice_split_key = in_prog->voice_split_key;
     prog->octave_sw = smap(in_prog->octave_sw, 8 - 3, 0 - 3);
 
     prog->tempo = htole16(in_prog->tempo);
