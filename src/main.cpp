@@ -1,9 +1,11 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "immapp/immapp.h"
-#include "implot/implot.h"
 
 #include "hello_imgui/hello_imgui.h"
+
 #include "imgui-knobs/imgui-knobs.h"
+#include "imgui_test_engine/imgui_te_ui.h"
+
 #include "portable_file_dialogs/portable_file_dialogs.h"
 
 #include "math.h"
@@ -14,16 +16,13 @@
 #include "program.hpp"
 #include "jack_midi_interface.hpp"
 #include "settings.hpp"
+#include "app.hpp"
+#include "gui/gui_params.hpp"
 
-#include "imgui_test_engine/imgui_te_context.h"
-
-#include "imgui_test_engine/imgui_te_engine.h"
-#include "imgui_test_engine/imgui_te_ui.h"
+#include "../tests/gui_tests.hpp"
 
 using HelloImGui::Log;
 using HelloImGui::LogLevel;
-
-#define ENUM_SEL(NAME) "**/###" #NAME
 
 #define GRAPH_SIZE ImVec2{320, 80}
 
@@ -31,155 +30,6 @@ using HelloImGui::LogLevel;
 
 float lerp(float a, float b, float f) {
     return a * (1.0 - f) + (b * f);
-}
-
-enum AppFlags {
-    AF_NONE = 0,
-    AF_TIMBRE_PARAMS = 1 << 0,
-};
-
-struct App {
-    int flags;
-
-    Program program;
-    Timbre* selected_timbre;
-    int selected_timbre_idx;
-
-    MidiInterface* midi;
-
-    ImFont* regular_font;
-};
-
-App g_app = {};
-
-bool app_init(App* out_app) {
-    Log(LogLevel::Info, "Initializing app");
-
-    *out_app = {};
-    out_app->midi = new JACKMidi();
-
-    if (out_app->midi == nullptr) {
-        Log(LogLevel::Error, "Failed to allocate MIDI interface");
-
-        return false;
-    }
-
-    if (!out_app->midi->init()) {
-        Log(LogLevel::Error, "Failed to initialize MIDI interface");
-
-        return false;
-    }
-
-    out_app->selected_timbre = &out_app->program.timbre_arr[out_app->selected_timbre_idx];
-
-    Log(LogLevel::Info, "Successfully initialized app");
-
-    return true;
-}
-
-void app_deinit(App* app) {
-    Log(LogLevel::Info, "Deinitializing app");
-
-    app->midi->deinit();
-
-    Log(LogLevel::Info, "Successfully deinitialized app");
-}
-
-static ParamEx timbre_ex(ParamEx param) {
-    param.param_id = param.param_id;
-
-    int16_t timbre_id = TIMBRE_1_ID;
-    if (g_app.selected_timbre == &g_app.program.timbre_arr[1]) {
-        timbre_id = TIMBRE_2_ID;
-    }
-
-    param.param_id += timbre_id;
-
-    return param;
-}
-
-static void push_timbre_params() {
-    g_app.flags |= AF_TIMBRE_PARAMS;
-}
-
-static void pop_timbre_params() {
-    g_app.flags &= ~AF_TIMBRE_PARAMS;
-}
-
-void parameter_slider(int* value, ParamEx param, const char* name, int min = 0, int max = 127) {
-    if (g_app.flags & AF_TIMBRE_PARAMS) {
-        param = timbre_ex(param);
-    }
-
-    *value = std::clamp(*value, min, max);
-
-    if (ImGui::SliderScalar(name, ImGuiDataType_S32, value, &min, &max, "%d")) {
-        g_app.midi->send_control_change_ex(param, *value);
-    }
-}
-
-void parameter_knob(int* value, ParamEx param, const char* name, int min = 0, int max = 127) {
-    if (g_app.flags & AF_TIMBRE_PARAMS) {
-        param = timbre_ex(param);
-    }
-
-    *value = std::clamp(*value, min, max);
-
-    if (ImGuiKnobs::KnobInt(name, value, min, max, 1, "%d", ImGuiKnobVariant_Tick)) {
-        g_app.midi->send_control_change_ex(param, *value);
-    }
-}
-
-void parameter_input(int* value, ParamEx param, const char* name) {
-    if (g_app.flags & AF_TIMBRE_PARAMS) {
-        param = timbre_ex(param);
-    }
-
-    if (ImGui::InputScalar(name, ImGuiDataType_U16, value)) {
-        g_app.midi->send_control_change_ex(param, *value);
-    }
-}
-
-void parameter_checkbox(int* value, ParamEx param, const char* name) {
-    if (g_app.flags & AF_TIMBRE_PARAMS) {
-        param = timbre_ex(param);
-    }
-
-    bool bval = *value;
-    if (ImGui::Checkbox(name, &bval)) {
-        *value = bval;
-        g_app.midi->send_control_change_ex(param, *value);
-    }
-}
-
-void parameter_enum(int* value, ParamEx param, const char* name, const EnumArr* enum_arr) {
-    if (g_app.flags & AF_TIMBRE_PARAMS) {
-        param = timbre_ex(param);
-    }
-
-    size_t value_idx = 0;
-
-    for (ssize_t i = enum_arr->size - 1; i > 0; i--) {
-        if (*value >= enum_arr->arr[i].value) {
-            *value = enum_arr->arr[i].value;
-            value_idx = i;
-            break;
-        }
-    }
-
-    if (ImGui::BeginCombo(name, enum_arr->arr[value_idx].name)) {
-        for (size_t i = 0; i < enum_arr->size; i++) {
-            bool is_selected = value_idx == i;
-            if (ImGui::Selectable(enum_arr->arr[i].name, is_selected)) {
-                *value = enum_arr->arr[i].value;
-                g_app.midi->send_control_change_ex(param, *value);
-            }
-            if (is_selected) {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
 }
 
 void filter_graph_gui(Filter* filter, size_t idx) {
@@ -465,8 +315,8 @@ void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
             int dx = IO.MouseDelta.x / SENSITIVITY;
             int dy = IO.MouseDelta.y / SENSITIVITY;
             ParamEx param_ex = params[i];
-            if (g_app.flags & AF_TIMBRE_PARAMS) {
-                param_ex = timbre_ex(param_ex);
+            if (g_app()->flags & AF_TIMBRE_PARAMS) {
+                param_ex = app_timbre_ex(param_ex);
             }
 
             int* param_ptr = NULL;
@@ -489,7 +339,7 @@ void eg_graph_gui(EnvelopeGenerator* eg, const ParamEx *params) {
             }
 
             *param_ptr = std::clamp(*param_ptr + change, 0, 127);
-            g_app.midi->send_control_change_ex(param_ex, *param_ptr);
+            g_app()->midi->send_control_change_ex(param_ex, *param_ptr);
         }
 
         ImGui::PopID();
@@ -758,7 +608,7 @@ void patch_gui(Timbre* timbre, const char* window_name) {
 }
 
 void timbre_gui(Timbre* timbre) {
-    push_timbre_params();
+    app_push_timbre_params();
 
     filter_gui(&timbre->filter_arr[0], "Filter 1###filter1", 0);
     filter_gui(&timbre->filter_arr[1], "Filter 2###filter2", 1);
@@ -782,7 +632,7 @@ void timbre_gui(Timbre* timbre) {
 
     pitch_gui(&timbre->pitch, "Pitch Settings###pitch");
 
-    pop_timbre_params();
+    app_pop_timbre_params();
 }
 
 void program_gui(Program* program) {
@@ -794,7 +644,7 @@ void program_gui(Program* program) {
         ImGui::SetNextItemWidth(80);
         if (ImGui::InputText("Name###name", program->name, ARRAY_SIZE(program->name), ImGuiInputTextFlags_EnterReturnsTrue)) {
             for (uint16_t i = 0; i < ARRAY_SIZE(program->name) - 1; i++) {
-                g_app.midi->send_control_change_ex({0x0, i}, program->name[i]);
+                g_app()->midi->send_control_change_ex({0x0, i}, program->name[i]);
             }
         }
 
@@ -803,15 +653,15 @@ void program_gui(Program* program) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(160);
         if (ImGui::SliderScalar("Tempo###tempo", ImGuiDataType_S16, &program->tempo, &min, &max, "%d")) {
-            g_app.midi->send_control_change_ex({0x60, 0}, program->tempo);
+            g_app()->midi->send_control_change_ex({0x60, 0}, program->tempo);
         }
 
         static const char* items[] = {"Timbre 1", "Timbre 2"};
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(160);
-        if (ImGui::Combo("Timbre###timbre", &g_app.selected_timbre_idx, items, ARRAY_SIZE(items))) {
-            g_app.selected_timbre = &g_app.program.timbre_arr[g_app.selected_timbre_idx];
+        if (ImGui::Combo("Timbre###timbre", &g_app()->selected_timbre_idx, items, ARRAY_SIZE(items))) {
+            g_app()->selected_timbre = &g_app()->program.timbre_arr[g_app()->selected_timbre_idx];
         }
 
         ImGui::SameLine();
@@ -836,19 +686,19 @@ void program_gui(Program* program) {
         ImGui::OpenPopup("Patches###patch");
     }
 
-    program_data_gui(&g_app.program, "Program Settings###program_data");
+    program_data_gui(&g_app()->program, "Program Settings###program_data");
     if (open_program_data) {
         ImGui::OpenPopup("Program Settings###program_data");
     }
 }
 
 void app_gui() {
-    ImGui::PushFont(g_app.regular_font);
+    ImGui::PushFont(g_app()->regular_font);
     ImGuiStyle& style = ImGui::GetStyle();
     ImGui::PushStyleColor(ImGuiCol_ChildBg, 0);
 
-    program_gui(&g_app.program);
-    timbre_gui(g_app.selected_timbre);
+    program_gui(&g_app()->program);
+    timbre_gui(g_app()->selected_timbre);
 
     ImGui::PopStyleColor();
     ImGui::PopFont();
@@ -870,7 +720,7 @@ void dialog_cur_program_save() {
         return;
     }
 
-    int rc = program_save(&g_app.program, result.c_str());
+    int rc = program_save(&g_app()->program, result.c_str());
     if (rc < 0) {
         Log(LogLevel::Error, "Failed to save program to file: %s", strerror(errno));
         return;
@@ -887,7 +737,7 @@ void dialog_program_open() {
         return;
     }
 
-    int rc = program_open(&g_app.program, result[0].c_str());
+    int rc = program_open(&g_app()->program, result[0].c_str());
     if (rc < 0) {
         Log(LogLevel::Error, "Failed to open program file: %s", strerror(errno));
         return;
@@ -899,21 +749,21 @@ void dialog_program_open() {
 void app_menu_bar_gui() {
     if (ImGui::BeginMenu("MIDI")) {
         if (ImGui::MenuItem("Request Current Program Dump")) {
-            bool ok = g_app.midi->send_cur_program_dump_req();
+            bool ok = g_app()->midi->send_cur_program_dump_req();
             if (!ok) {
                 Log(LogLevel::Error, "Failed to send current program dump request");
             }
         }
 
         if (ImGui::MenuItem("Send Current Program Dump")) {
-            bool ok = g_app.midi->send_cur_program_dump(&g_app.program);
+            bool ok = g_app()->midi->send_cur_program_dump(&g_app()->program);
             if (!ok) {
                 Log(LogLevel::Error, "Failed to send current program dump");
             }
         }
 
         if (ImGui::MenuItem("Write request")) {
-            bool ok = g_app.midi->send_program_write_req(0);
+            bool ok = g_app()->midi->send_program_write_req(0);
             if (!ok) {
                 Log(LogLevel::Error, "Failed to send program write request");
             }
@@ -935,14 +785,14 @@ void app_menu_bar_gui() {
 }
 
 void app_pre_frame() {
-    bool ok = g_app.midi->handle_received_data(&g_app.program);
+    bool ok = g_app()->midi->handle_received_data(&g_app()->program);
     if (!ok) {
         Log(LogLevel::Error, "Failed to handle received data");
     }
 }
 
 void load_fonts() {
-    g_app.regular_font = HelloImGui::LoadFont("fonts/DroidSans.ttf", 12);
+    g_app()->regular_font = HelloImGui::LoadFont("fonts/DroidSans.ttf", 12);
 }
 
 std::vector<HelloImGui::DockingSplit> splits() {
@@ -951,7 +801,7 @@ std::vector<HelloImGui::DockingSplit> splits() {
 
 std::vector<HelloImGui::DockableWindow> windows() {
     auto program_window = HelloImGui::DockableWindow(
-        "Program###program", "MainDockSpace", []() { program_gui(&g_app.program); });
+        "Program###program", "MainDockSpace", []() { program_gui(&g_app()->program); });
 
     auto logs_window = HelloImGui::DockableWindow(
         "Logs###win_logs", "MainDockSpace", []() { HelloImGui::LogGui(); });
@@ -968,488 +818,8 @@ HelloImGui::DockingParams layout() {
     return params;
 }
 
-void register_tests() {
-    ImGuiTestEngine* e = HelloImGui::GetImGuiTestEngine();
-
-    App orig_app = g_app;
-
-    static constexpr const char* root_sel = "//";
-
-    static constexpr const char* win_filter1_sel = "//###filter1";
-    static constexpr const char* win_filter2_sel = "//###filter2";
-    static constexpr const char* filt_type_bal_sel = "/###type_bal";
-    static constexpr const char* filt_cutoff_sel = "/###cutoff/###cutoff";
-    static constexpr const char* filt_resonance_sel = "/###resonance/###resonance";
-    static constexpr const char* filt_eg1_int_sel = "/###eg1_int/###eg1_int";
-    static constexpr const char* filt_key_trk_sel = "/###key_trk/###key_trk";
-    static constexpr const char* filt_vel_sens_sel = "/###vel_sens/###vel_sens";
-
-    static constexpr const char* win_osc1_sel = "//###osc1";
-    static constexpr const char* win_osc2_sel = "//###osc2";
-    static constexpr const char* osc_wave_sel = "**/###wave";
-    static constexpr const char* osc_mod_sel = "**/###mod";
-
-    static constexpr const char* osc_control1_sel = "/###control1/###control1";
-    static constexpr const char* osc_control2_sel = "/###control2/###control2";
-    static constexpr const char* osc_pcm_dwgs_wave_sel = "/###pcm_dwgs_wave/###pcm_dwgs_wave";
-    static constexpr const char* osc_semitone_sel = "/###semitone/###semitone";
-    static constexpr const char* osc_tune_sel = "/###tune/###tune";
-
-    static constexpr const char* win_eg1_sel = "//###eg1";
-    static constexpr const char* win_eg2_sel = "//###eg2";
-    static constexpr const char* win_eg3_sel = "//###eg3";
-
-    static constexpr const char* eg_graph_sel = "/###eg";
-    static constexpr const char* eg_attack_sel = "/$$0/###grabber";
-    static constexpr const char* eg_decay_sel = "/$$1/###grabber";
-    static constexpr const char* eg_sustain_sel = "/$$2/###grabber";
-    static constexpr const char* eg_release_sel = "/$$3/###grabber";
-
-    static constexpr const char* eg_vel_sens_sel = "/###vel_sens";
-
-    auto enum_click = [](ImGuiTestContext* ctx, const char* win_sel, const char* enum_sel) {
-        ctx->SetRef(win_sel);
-        ctx->SetRef(enum_sel);
-
-        ctx->ItemClick("");
-        ctx->SetRef(root_sel);
-    };
-
-    auto enum_click_child = [](ImGuiTestContext* ctx, const char* win_sel, const char* child_sel, const char* enum_sel) {
-        ctx->SetRef(win_sel);
-        ctx->SetRef(ctx->WindowInfo(child_sel).Window);
-        ctx->SetRef(enum_sel);
-
-        ctx->ItemClick("");
-        ctx->SetRef(root_sel);
-    };
-
-    ImGuiTest* filter1__balance_type = IM_REGISTER_TEST(e, "filter1", "balance_type");
-    filter1__balance_type->TestFunc = [&](ImGuiTestContext* ctx) {
-        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB1_24LPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_24LPF);
-
-        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB1_12LPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_12LPF);
-
-        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB1_HPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_HPF);
-
-        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB1_BPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_BPF);
-
-        enum_click(ctx, win_filter1_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB1_THRU));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].type_bal, FTB1_THRU);
-    };
-
-    ImGuiTest* filter1__cutoff = IM_REGISTER_TEST(e, "filter1", "cutoff");
-    filter1__cutoff->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter1_sel);
-        ctx->SetRef(filt_cutoff_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].cutoff, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].cutoff, 127);
-    };
-
-    ImGuiTest* filter1__resonance = IM_REGISTER_TEST(e, "filter1", "resonance");
-    filter1__resonance->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter1_sel);
-        ctx->SetRef(filt_resonance_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].resonance, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].resonance, 127);
-    };
-
-    ImGuiTest* filter1__eg1_int = IM_REGISTER_TEST(e, "filter1", "eg1_int");
-    filter1__eg1_int->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter1_sel);
-        ctx->SetRef(filt_eg1_int_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].eg1_int, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].eg1_int, 63);
-    };
-
-    ImGuiTest* filter1__key_trk = IM_REGISTER_TEST(e, "filter1", "key_trk");
-    filter1__key_trk->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter1_sel);
-        ctx->SetRef(filt_key_trk_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].key_trk, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].key_trk, 63);
-    };
-
-    ImGuiTest* filter1__vel_sens = IM_REGISTER_TEST(e, "filter1", "vel_sens");
-    filter1__vel_sens->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter1_sel);
-        ctx->SetRef(filt_vel_sens_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].vel_sens, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[0].vel_sens, 63);
-    };
-
-    ImGuiTest* filter2__balance_type = IM_REGISTER_TEST(e, "filter2", "balance_type");
-    filter2__balance_type->TestFunc = [&](ImGuiTestContext* ctx) {
-        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB2_12LPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_12LPF);
-
-        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB2_HPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_HPF);
-
-        enum_click(ctx, win_filter2_sel, filt_type_bal_sel);
-        ctx->ItemClick(ENUM_SEL(FTB2_BPF));
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].type_bal, FTB2_BPF);
-    };
-
-    ImGuiTest* filter2__cutoff = IM_REGISTER_TEST(e, "filter2", "cutoff");
-    filter2__cutoff->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter2_sel);
-        ctx->SetRef(filt_cutoff_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].cutoff, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].cutoff, 127);
-    };
-
-    ImGuiTest* filter2__resonance = IM_REGISTER_TEST(e, "filter2", "resonance");
-    filter2__resonance->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter2_sel);
-        ctx->SetRef(filt_resonance_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].resonance, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].resonance, 127);
-    };
-
-    ImGuiTest* filter2__eg1_int = IM_REGISTER_TEST(e, "filter2", "eg1_int");
-    filter2__eg1_int->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter2_sel);
-        ctx->SetRef(filt_eg1_int_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].eg1_int, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].eg1_int, 63);
-    };
-
-    ImGuiTest* filter2__key_trk = IM_REGISTER_TEST(e, "filter2", "key_trk");
-    filter2__key_trk->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter2_sel);
-        ctx->SetRef(filt_key_trk_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].key_trk, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].key_trk, 63);
-    };
-
-    ImGuiTest* filter2__vel_sens = IM_REGISTER_TEST(e, "filter2", "vel_sens");
-    filter2__vel_sens->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_filter2_sel);
-        ctx->SetRef(filt_vel_sens_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].vel_sens, -63);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->filter_arr[1].vel_sens, 63);
-    };
-
-    ImGuiTest* eg1__vel_sens = IM_REGISTER_TEST(e, "eg1", "vel_sens");
-    eg1__vel_sens->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg1_sel);
-        ctx->SetRef(eg_vel_sens_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].vel_sens, -63);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].vel_sens, 63);
-    };
-
-    ImGuiTest* eg1__attack = IM_REGISTER_TEST(e, "eg1", "attack");
-    eg1__attack->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg1_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_attack_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].attack, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].attack, 127);
-    };
-
-    ImGuiTest* eg1__decay = IM_REGISTER_TEST(e, "eg1", "decay");
-    eg1__decay->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg1_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_decay_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].decay, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].decay, 127);
-    };
-
-    ImGuiTest* eg1__sustain = IM_REGISTER_TEST(e, "eg1", "sustain");
-    eg1__sustain->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg1_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_sustain_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].sustain, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].sustain, 127);
-    };
-
-    ImGuiTest* eg1__release = IM_REGISTER_TEST(e, "eg1", "release");
-    eg1__release->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg1_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_release_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].release, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[0].release, 127);
-    };
-
-    ImGuiTest* eg2__vel_sens = IM_REGISTER_TEST(e, "eg2", "vel_sens");
-    eg2__vel_sens->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg2_sel);
-        ctx->SetRef(eg_vel_sens_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].vel_sens, -63);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].vel_sens, 63);
-    };
-
-    ImGuiTest* eg2__attack = IM_REGISTER_TEST(e, "eg2", "attack");
-    eg2__attack->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg2_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_attack_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].attack, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].attack, 127);
-    };
-
-    ImGuiTest* eg2__decay = IM_REGISTER_TEST(e, "eg2", "decay");
-    eg2__decay->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg2_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_decay_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].decay, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].decay, 127);
-    };
-
-    ImGuiTest* eg2__sustain = IM_REGISTER_TEST(e, "eg2", "sustain");
-    eg2__sustain->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg2_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_sustain_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].sustain, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].sustain, 127);
-    };
-
-    ImGuiTest* eg2__release = IM_REGISTER_TEST(e, "eg2", "release");
-    eg2__release->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg2_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_release_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].release, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[1].release, 127);
-    };
-
-    ImGuiTest* eg3__vel_sens = IM_REGISTER_TEST(e, "eg3", "vel_sens");
-    eg3__vel_sens->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg3_sel);
-        ctx->SetRef(eg_vel_sens_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].vel_sens, -63);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].vel_sens, 63);
-    };
-
-    ImGuiTest* eg3__attack = IM_REGISTER_TEST(e, "eg3", "attack");
-    eg3__attack->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg3_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_attack_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].attack, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].attack, 127);
-    };
-
-    ImGuiTest* eg3__decay = IM_REGISTER_TEST(e, "eg3", "decay");
-    eg3__decay->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg3_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_decay_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].decay, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].decay, 127);
-    };
-
-    ImGuiTest* eg3__sustain = IM_REGISTER_TEST(e, "eg3", "sustain");
-    eg3__sustain->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg3_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_sustain_sel);
-
-        ctx->ItemDragWithDelta("", {0, 130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].sustain, 0);
-
-        ctx->ItemDragWithDelta("", {0, -130});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].sustain, 127);
-    };
-
-    ImGuiTest* eg3__release = IM_REGISTER_TEST(e, "eg3", "release");
-    eg3__release->TestFunc = [&](ImGuiTestContext* ctx) {
-        ctx->SetRef(win_eg3_sel);
-        ctx->SetRef(ctx->WindowInfo(eg_graph_sel).Window);
-        ctx->SetRef(eg_release_sel);
-
-        ctx->ItemDragWithDelta("", {-130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].release, 0);
-
-        ctx->ItemDragWithDelta("", {130, 0});
-        IM_CHECK_EQ(g_app.selected_timbre->eg_arr[2].release, 127);
-    };
-
-
-    // ImGuiTest* osc1__wave = IM_REGISTER_TEST(e, "osc1", "wave");
-    // osc1__wave->TestFunc = [&](ImGuiTestContext* ctx) {
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_SAW));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_PULSE));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_SIN));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_TRIANGLE));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_FORMANT));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_NOISE));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_PCM_DWGS));
-
-    //     enum_click(ctx, win_osc1_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_WT_AUDIO_IN));
-    // };
-
-    // ImGuiTest* osc1__mod = IM_REGISTER_TEST(e, "osc1", "mod");
-    // osc1__mod->TestFunc = [&](ImGuiTestContext* ctx) {
-    //     enum_click(ctx, win_osc1_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_OM_WAVE));
-
-    //     enum_click(ctx, win_osc1_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_OM_CROSS));
-
-    //     enum_click(ctx, win_osc1_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_OM_UNISON));
-
-    //     enum_click(ctx, win_osc1_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC1_OM_VPM));
-    // };
-
-    // ImGuiTest* osc2__wave = IM_REGISTER_TEST(e, "osc2", "wave");
-    // osc2__wave->TestFunc = [&](ImGuiTestContext* ctx) {
-    //     enum_click(ctx, win_osc2_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_WT_SAW));
-
-    //     enum_click(ctx, win_osc2_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_WT_PULSE));
-
-    //     enum_click(ctx, win_osc2_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_WT_SIN));
-
-    //     enum_click(ctx, win_osc2_sel, osc_wave_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_WT_TRIANGLE));
-    // };
-
-    // ImGuiTest* osc2__mod = IM_REGISTER_TEST(e, "osc2", "mod");
-    // osc2__mod->TestFunc = [&](ImGuiTestContext* ctx) {
-    //     enum_click(ctx, win_osc2_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_OM_OFF));
-
-    //     enum_click(ctx, win_osc2_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_OM_RING));
-
-    //     enum_click(ctx, win_osc2_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_OM_SYNC));
-
-    //     enum_click(ctx, win_osc2_sel, osc_mod_sel);
-    //     ctx->ItemClick(ENUM_SEL(OSC2_OM_RINGSYNC));
-    // };
-}
-
 int main(int, char *[]) {
-    bool ok = app_init(&g_app);
+    bool ok = app_init(g_app());
     if (!ok) {
         Log(LogLevel::Error, "Failed to initialize controller\n");
         return 1;
@@ -1473,21 +843,19 @@ int main(int, char *[]) {
     runner_params.callbacks.LoadAdditionalFonts = load_fonts;
     runner_params.callbacks.RegisterTests = register_tests;
 
-    runner_params.fpsIdling.enableIdling = false;
+    runner_params.useImGuiTestEngine = true;
 
     runner_params.dockingParams = layout();
 
     runner_params.appWindowParams.windowTitle = "MicroKORG XL Controller";
     runner_params.appWindowParams.windowGeometry = { .size = {600, 800} };
 
-    runner_params.useImGuiTestEngine = true;
-
     ImmApp::AddOnsParams addons_params;
     addons_params.withImplot = true;
 
     ImmApp::Run(runner_params, addons_params);
 
-    app_deinit(&g_app);
+    app_deinit(g_app());
 
     return 0;
 }
